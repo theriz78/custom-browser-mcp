@@ -17,6 +17,8 @@ export interface ClaudeNode {
   radius?: [number, number, number, number];
   border?: { w: number; color: string };
   clip?: boolean;
+  svg?: string;
+  gradient?: string;
   children?: ClaudeNode[];
 }
 
@@ -44,12 +46,18 @@ export interface ClaudeBundle {
   extract_duration_ms?: number;
 }
 
+export interface ExtractOptions {
+  maxNodes?: number;
+}
+
 export async function extractClaudeBundle(
   page: Page,
-  viewport: { width: number; height: number }
+  viewport: { width: number; height: number },
+  options: ExtractOptions = {}
 ): Promise<Omit<ClaudeBundle, "captured_at" | "metrics" | "url">> {
   const started = Date.now();
-  const raw = await page.evaluate(() => {
+  const maxNodes = options.maxNodes ?? 800;
+  const raw = await page.evaluate((injectedMaxNodes: number) => {
     type RawNode = {
       tag: string;
       role: string | null;
@@ -66,15 +74,17 @@ export async function extractClaudeBundle(
       radius: [number, number, number, number] | null;
       border: { w: number; color: string } | null;
       clip: boolean;
+      svg: string | null;
+      gradient: string | null;
       hasShadowRoot: boolean;
       isIframe: boolean;
       hasGradient: boolean;
       children: RawNode[];
     };
 
-    const counters = { shadow_dom_skipped: 0, iframe_cross_origin: 0, bg_gradient_unmapped: 0 };
+    const counters = { shadow_dom_skipped: 0, iframe_cross_origin: 0, bg_gradient_unmapped: 0, pseudo_extracted: 0 };
     let visitedCount = 0;
-    const MAX_NODES = 800;
+    const MAX_NODES = injectedMaxNodes;
 
     function isHidden(el: Element): boolean {
       const cs = getComputedStyle(el as HTMLElement);
@@ -162,6 +172,70 @@ export async function extractClaudeBundle(
       return s.replace(/\s+/g, " ").trim();
     }
 
+    function parsePseudoContent(raw: string): string | null {
+      if (!raw || raw === "none" || raw === "normal") return null;
+      const trimmed = raw.trim();
+      if (trimmed.startsWith('"') && trimmed.endsWith('"')) return trimmed.slice(1, -1);
+      if (trimmed.startsWith("'") && trimmed.endsWith("'")) return trimmed.slice(1, -1);
+      if (trimmed.startsWith("url(") || trimmed.startsWith("counter(") || trimmed.startsWith("attr(")) return null;
+      return trimmed;
+    }
+
+    function walkPseudo(el: Element, pseudo: "::before" | "::after", parentBox: DOMRect): RawNode | null {
+      if (visitedCount >= MAX_NODES) return null;
+      const cs = getComputedStyle(el as HTMLElement, pseudo);
+      if (!cs.content || cs.content === "none" || cs.content === "normal") return null;
+      if (cs.display === "none" || cs.visibility === "hidden") return null;
+      const op = parseFloat(cs.opacity);
+      if (!Number.isNaN(op) && op === 0) return null;
+
+      const text = parsePseudoContent(cs.content);
+      const bgUrlVal = cs.backgroundImage && cs.backgroundImage !== "none" ? bgUrl(cs.backgroundImage) : null;
+      const fillColor = normColor(cs.backgroundColor);
+      if (!text && !bgUrlVal && !fillColor) return null;
+
+      visitedCount++;
+      counters.pseudo_extracted++;
+
+      const w = parseFloat(cs.width);
+      const h = parseFloat(cs.height);
+      const top = parseFloat(cs.top);
+      const left = parseFloat(cs.left);
+      const px = Number.isFinite(left) ? parentBox.left + left : parentBox.left;
+      const py = Number.isFinite(top) ? parentBox.top + top : parentBox.top;
+      const pw = Number.isFinite(w) && w > 0 ? w : parentBox.width;
+      const ph = Number.isFinite(h) && h > 0 ? h : Math.max(parseFloat(cs.fontSize) || 16, 16);
+
+      const fontFamily = (cs.fontFamily ?? "").split(",")[0]?.replace(/["']/g, "").trim() || null;
+      const fontSizeRaw = parseFloat(cs.fontSize);
+      const fontSize = Number.isFinite(fontSizeRaw) ? Math.round(fontSizeRaw) : null;
+      const textColor = text ? normColor(cs.color) : null;
+
+      return {
+        tag: text ? "TEXT" : bgUrlVal ? "IMAGE" : "FRAME",
+        role: `pseudo${pseudo}`,
+        box: [Math.round(px), Math.round(py), Math.round(pw), Math.round(ph)],
+        fill: fillColor,
+        z: null,
+        chars: text,
+        family: fontFamily,
+        weight: text ? cs.fontWeight || null : null,
+        size: text ? fontSize : null,
+        color: textColor,
+        src: bgUrlVal,
+        fit: bgUrlVal ? (cs.backgroundSize === "contain" ? "FIT" : "FILL") : null,
+        radius: parseRadius(cs),
+        border: null,
+        clip: cs.overflow !== "visible",
+        svg: null,
+        gradient: null,
+        hasShadowRoot: false,
+        isIframe: false,
+        hasGradient: cs.backgroundImage?.includes("gradient") ?? false,
+        children: [],
+      };
+    }
+
     function walk(el: Element): RawNode | null {
       if (visitedCount >= MAX_NODES) return null;
       if (isHidden(el)) return null;
@@ -219,11 +293,17 @@ export async function extractClaudeBundle(
           : null;
 
       const childrenRaw: RawNode[] = [];
+      const beforeNode = walkPseudo(el, "::before", r);
+      if (beforeNode) childrenRaw.push(beforeNode);
+
       for (const child of Array.from(el.children)) {
         const sub = walk(child);
         if (sub) childrenRaw.push(sub);
         if (visitedCount >= MAX_NODES) break;
       }
+
+      const afterNode = walkPseudo(el, "::after", r);
+      if (afterNode) childrenRaw.push(afterNode);
 
       const isCustomElement = el.tagName.includes("-");
       if (hasShadowRoot) {
@@ -241,6 +321,18 @@ export async function extractClaudeBundle(
 
       childrenRaw.sort((a, b) => (a.z ?? 0) - (b.z ?? 0));
 
+      const isSvg = el.tagName.toLowerCase() === "svg";
+      let svgOuter: string | null = null;
+      if (isSvg) {
+        const html = (el as Element & { outerHTML: string }).outerHTML ?? "";
+        svgOuter = html.length > 20000 ? html.slice(0, 20000) + "<!--TRUNCATED-->" : html;
+      }
+
+      let gradientRaw: string | null = null;
+      if (cs.backgroundImage && (cs.backgroundImage.startsWith("linear-gradient") || cs.backgroundImage.startsWith("radial-gradient"))) {
+        gradientRaw = cs.backgroundImage.length > 2000 ? cs.backgroundImage.slice(0, 2000) : cs.backgroundImage;
+      }
+
       const node: RawNode = {
         tag: bestType(el, cs, hasText, !!fill),
         role: pickRole(el),
@@ -257,6 +349,8 @@ export async function extractClaudeBundle(
         radius: parseRadius(cs),
         border,
         clip: cs.overflow !== "visible",
+        svg: svgOuter,
+        gradient: gradientRaw,
         hasShadowRoot,
         isIframe,
         hasGradient: cs.backgroundImage?.includes("gradient") ?? false,
@@ -292,7 +386,7 @@ export async function extractClaudeBundle(
       }
     }
     return { root, counters, visitedCount, spacingValues: [...spacingValues] };
-  });
+  }, maxNodes);
 
   const colors: Record<string, string> = {};
   const fonts: Record<string, { family: string; weights: string[] }> = {};
@@ -358,6 +452,8 @@ export async function extractClaudeBundle(
       out.border = { w: n.border.w, color: colorRef.get(n.border.color) ?? n.border.color };
     }
     if (n.clip) out.clip = true;
+    if (n.svg) out.svg = n.svg;
+    if (n.gradient) out.gradient = n.gradient;
     if (n.children?.length) {
       out.children = n.children.map(ref).filter((x: ClaudeNode | null): x is ClaudeNode => !!x);
     }
@@ -416,6 +512,13 @@ export async function extractClaudeBundle(
       kind: "bg_gradient_unmapped",
       count: raw.counters.bg_gradient_unmapped,
       hint: "CSS gradients flagged; Phase 3 GradientPaint mapping deferred",
+    });
+  }
+  if (raw.counters.pseudo_extracted > 0) {
+    warnings.push({
+      kind: "pseudo_extracted",
+      count: raw.counters.pseudo_extracted,
+      hint: "CSS ::before/::after pseudo-elements captured as synthetic children (role=pseudo::before/::after)",
     });
   }
 

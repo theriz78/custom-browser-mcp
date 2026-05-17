@@ -2,6 +2,8 @@
 
 > Eclectique Browser MCP — turns any live URL into a multi-output design bundle: a11y tree, design tokens, screenshot, Claude-consumable DSL, Figma REST JSON. Zero LLM API cost. Persistent Chromium context.
 
+**v0.6.0** (S60): SVG outerHTML preserved · CSS gradients → `GRADIENT_LINEAR`/`GRADIENT_RADIAL` paints · `::before`/`::after` pseudo-elements captured · `max_nodes` override · native JS click pattern documented for interactive-state forcing.
+
 [![MCP](https://img.shields.io/badge/MCP-1.29-blue)](https://modelcontextprotocol.io)
 [![Bun](https://img.shields.io/badge/Bun-1.3-fbf0df)](https://bun.sh)
 [![Playwright](https://img.shields.io/badge/Playwright-1.60-2ead33)](https://playwright.dev)
@@ -63,18 +65,19 @@ Sample: [`examples/awwwards-sotd.htmltoclaude.yaml`](examples/awwwards-sotd.html
 
 Output: `{ document: { children: [{ type: "CANVAS", children: [FigmaNode...] }] }, warnings, metrics }`. Mapping table:
 
-| ClaudeNode | FigmaNode | Coverage v0 |
+| ClaudeNode | FigmaNode | Coverage v0.6.0 |
 |---|---|---|
-| FRAME | FRAME | fill SOLID + corner radius + border + clip |
+| FRAME | FRAME | fill SOLID + corner radius + border + clip + GRADIENT_LINEAR/RADIAL |
 | TEXT | TEXT | characters + style (fontFamily/Size/Weight) |
 | IMAGE | RECTANGLE | fill IMAGE (imageRef = src, scaleMode) |
-| SVG | VECTOR | shell only — path data deferred Phase 3 |
+| SVG | VECTOR | `svgOuterHtml` preserved (truncated >20KB) |
 | GROUP | GROUP | container |
 | INPUT | FRAME | placeholder |
+| pseudo::before / pseudo::after | FRAME / TEXT / IMAGE | synthetic child from `getComputedStyle(el, '::before')` |
 
 Sample: [`examples/awwwards-sotd.htmltofigma.json`](examples/awwwards-sotd.htmltofigma.json) (180 nodes, ~174 KB JSON).
 
-Deferred Phase 3+: SVG paths, gradients (`GRADIENT_LINEAR`), box shadows (`DROP_SHADOW`), auto-layout, COMPONENT/INSTANCE detection.
+Deferred Phase 3+: full SVG path parse to native VECTOR geometry, conic-gradient, box shadows (`DROP_SHADOW` emit), auto-layout (Grid/Flexbox → AUTO_LAYOUT), COMPONENT/INSTANCE detection.
 
 ---
 

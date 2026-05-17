@@ -18,6 +18,7 @@ export const ToFigmaInput = z.object({
   allow_private_urls: z.boolean().default(false),
   pre_render_script: z.string().optional(),
   pre_render_delay_ms: z.number().int().nonnegative().default(0),
+  max_nodes: z.number().int().positive().max(10000).default(800),
 });
 export type ToFigmaInput = z.infer<typeof ToFigmaInput>;
 
@@ -62,7 +63,7 @@ export async function toFigma(rawInput: unknown): Promise<ToFigmaResult> {
         await page.waitForTimeout(input.pre_render_delay_ms);
       }
     }
-    const partial = await extractClaudeBundle(page, input.viewport);
+    const partial = await extractClaudeBundle(page, input.viewport, { maxNodes: input.max_nodes });
     const nodeCount = countNodes(partial.tree);
     const approxText = JSON.stringify(partial.tree);
     const claude: ClaudeBundle = {

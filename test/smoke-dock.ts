@@ -10,32 +10,18 @@ const OUT_DIR = resolve(import.meta.dir, "..", "out", "wayback-dock");
 
 const EXPAND_DOCK_SCRIPT = `
   (() => {
-    const css = \`
-      .menu-float, .menu-float * { overflow: visible !important; }
-      .menu-float__wrapper { min-width: 1200px !important; height: auto !important; }
-      .menu-float__top,
-      .menu-float__menu,
-      .menu-float__menu-content,
-      .menu-float__menu--main {
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        height: auto !important;
-        max-height: none !important;
-      }
-      .menu-float__menu-col { display: inline-block !important; vertical-align: top; padding: 12px; }
-      .menu-float {
-        height: auto !important;
-        min-height: 480px !important;
-        bottom: 30px !important;
-      }
-    \`;
-    const style = document.createElement('style');
-    style.id = 'force-dock-expand';
-    style.textContent = css;
-    document.head.appendChild(style);
-    document.querySelector('.menu-float')?.classList.add('is-expanded', 'is-open', 'expanded');
-    return { injected: true, dock_height: document.querySelector('.menu-float')?.offsetHeight ?? null };
+    const hamburger = document.querySelector('.menu-float__hamburger');
+    if (!hamburger) return { clicked: false, reason: 'hamburger not found' };
+    hamburger.click();
+    const menu = document.querySelector('.menu-float__menu');
+    const content = document.querySelector('.menu-float__menu-content');
+    const dock = document.querySelector('.menu-float');
+    return {
+      clicked: true,
+      menuClass: menu ? menu.className : null,
+      contentClass: content ? content.className : null,
+      dockHeight: dock ? dock.offsetHeight : null,
+    };
   })()
 `;
 
@@ -43,10 +29,10 @@ await mkdir(OUT_DIR, { recursive: true });
 
 async function captureState(stateName: string, script?: string) {
   const started = Date.now();
-  const args: any = { url, viewport: { width: 1440, height: 900 } };
+  const args: any = { url, viewport: { width: 1440, height: 900 }, max_nodes: 1500 };
   if (script) {
     args.pre_render_script = script;
-    args.pre_render_delay_ms = 500;
+    args.pre_render_delay_ms = 1200;
   }
   const { document, rendered } = await toFigma(args);
   const outPath = resolve(OUT_DIR, `${stateName}-${document.metrics.nodes}n.json`);

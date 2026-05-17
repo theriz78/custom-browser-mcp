@@ -11,7 +11,7 @@ import { closeSharedContext } from "./lib/browser.js";
 import { wrapUntrusted } from "./lib/untrusted.js";
 
 const SERVER_NAME = "eclectique-browser-mcp";
-const SERVER_VERSION = "0.5.0";
+const SERVER_VERSION = "0.6.0";
 
 const ANALYZE_PAGE_TOOL = {
   name: "analyze_page",
@@ -53,7 +53,7 @@ const ANALYZE_PAGE_TOOL = {
 const TO_CLAUDE_TOOL = {
   name: "to_claude",
   description:
-    "htmltoclaude v0: convert a live webpage to a compact YAML DSL (cbm/htmltoclaude/v0) Claude-consumable representation. Hoists colors+fonts to tokens, captures box/role/style per node, walks shadowRoot, surfaces iframe/gradient/CSS-filter gaps as warnings. Supports pre_render_script for JS injection before extraction.",
+    "htmltoclaude v0.1: convert a live webpage to a compact YAML DSL (cbm/htmltoclaude/v0) Claude-consumable representation. Hoists colors+fonts to tokens, captures box/role/style per node, walks shadowRoot, captures CSS pseudo-elements (::before/::after), preserves SVG outerHTML, captures raw gradient strings. Supports pre_render_script for JS injection + max_nodes override.",
   inputSchema: {
     type: "object",
     properties: {
@@ -70,12 +70,17 @@ const TO_CLAUDE_TOOL = {
       format: { enum: ["yaml", "json"], default: "yaml" },
       pre_render_script: {
         type: "string",
-        description: "JavaScript snippet evaluated via page.evaluate() AFTER navigation+cookie consent but BEFORE extraction. Use to force interactive states (expand docks, open menus, dismiss popups, scroll).",
+        description: "JavaScript snippet evaluated via page.evaluate() AFTER navigation+cookie consent but BEFORE extraction. Use to force interactive states (expand docks, open menus, dismiss popups, scroll). Prefer native element.click() over CSS overrides when the page uses JS toggles (real class transitions, e.g. .is-active/.is-show).",
       },
       pre_render_delay_ms: {
         type: "integer",
         default: 0,
-        description: "Optional wait in ms AFTER pre_render_script runs.",
+        description: "Optional wait in ms AFTER pre_render_script runs (let CSS transitions + JS-rendered DOM mutations settle).",
+      },
+      max_nodes: {
+        type: "integer",
+        default: 800,
+        description: "Cap on DOM nodes walked (depth-first from body). Bump to 1500-3000 for sites with rich content where the target subtree is positioned late in the body (e.g. fixed docks at bottom). Max 10000.",
       },
     },
     required: ["url"],
@@ -85,7 +90,7 @@ const TO_CLAUDE_TOOL = {
 const TO_FIGMA_TOOL = {
   name: "to_figma",
   description:
-    "Phase 2 v0 DOM→Figma JSON adapter (cbm/htmltofigma/v0). Reuses htmltoclaude walker then maps to Figma REST node format (FRAME/TEXT/RECTANGLE/VECTOR/GROUP). Solid fills + corner radius + borders + clip + text style emitted. SVG paths/gradients/iframes deferred (warnings). Supports pre_render_script for JS injection (interactive state forcing) before capture.",
+    "Phase 2 v0.1 DOM→Figma JSON adapter (cbm/htmltofigma/v0). Reuses htmltoclaude walker then maps to Figma REST node format (FRAME/TEXT/RECTANGLE/VECTOR/GROUP). v0.6.0 adds: SVG outerHTML preserved (svgOuterHtml field on VECTOR), GRADIENT_LINEAR/GRADIENT_RADIAL paints with stops + handlePositions, CSS pseudo-elements (::before/::after) as synthetic children, max_nodes override. Supports pre_render_script for JS injection before capture.",
   inputSchema: {
     type: "object",
     properties: {
@@ -101,12 +106,17 @@ const TO_FIGMA_TOOL = {
       timeout_ms: { type: "integer", default: 30000 },
       pre_render_script: {
         type: "string",
-        description: "JavaScript snippet evaluated via page.evaluate() AFTER navigation+cookie consent but BEFORE extraction. Use to force interactive states (expand docks, open menus, dismiss popups, scroll).",
+        description: "JavaScript snippet evaluated via page.evaluate() AFTER navigation+cookie consent but BEFORE extraction. Use native element.click() (e.g. document.querySelector('.hamburger').click()) over CSS overrides when JS handlers toggle real classes (is-active/is-show).",
       },
       pre_render_delay_ms: {
         type: "integer",
         default: 0,
-        description: "Optional wait in ms AFTER pre_render_script runs.",
+        description: "Optional wait in ms AFTER pre_render_script runs (let CSS transitions + JS DOM mutations settle).",
+      },
+      max_nodes: {
+        type: "integer",
+        default: 800,
+        description: "Cap on DOM nodes walked. Bump to 1500-3000 for sites with rich content where target subtree positioned late in body. Max 10000.",
       },
     },
     required: ["url"],

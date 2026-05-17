@@ -7,12 +7,24 @@ export interface FigmaColor {
   a: number;
 }
 
+export interface FigmaGradientStop {
+  color: FigmaColor;
+  position: number;
+}
+
+export interface FigmaGradientHandle {
+  x: number;
+  y: number;
+}
+
 export interface FigmaPaint {
-  type: "SOLID" | "IMAGE" | "GRADIENT_LINEAR";
+  type: "SOLID" | "IMAGE" | "GRADIENT_LINEAR" | "GRADIENT_RADIAL";
   color?: FigmaColor;
   scaleMode?: "FILL" | "FIT";
   imageRef?: string;
   visible?: boolean;
+  gradientStops?: FigmaGradientStop[];
+  gradientHandlePositions?: [FigmaGradientHandle, FigmaGradientHandle, FigmaGradientHandle];
 }
 
 export interface FigmaEffect {
@@ -57,6 +69,7 @@ export interface FigmaNode {
   clipsContent?: boolean;
   characters?: string;
   style?: FigmaTextStyle;
+  svgOuterHtml?: string;
   children?: FigmaNode[];
 }
 
@@ -85,6 +98,113 @@ export interface FigmaDocument {
 }
 
 const WHITE: FigmaColor = { r: 1, g: 1, b: 1, a: 1 };
+
+function angleToHandles(angleDeg: number): [FigmaGradientHandle, FigmaGradientHandle, FigmaGradientHandle] {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  const cx = 0.5, cy = 0.5;
+  const dx = Math.cos(rad) / 2;
+  const dy = Math.sin(rad) / 2;
+  const start: FigmaGradientHandle = { x: cx - dx, y: cy - dy };
+  const end: FigmaGradientHandle = { x: cx + dx, y: cy + dy };
+  const width: FigmaGradientHandle = { x: cx - dy, y: cy + dx };
+  return [start, end, width];
+}
+
+function parseGradientStops(stopsRaw: string): FigmaGradientStop[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const ch of stopsRaw) {
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    if (ch === "," && depth === 0) { parts.push(current.trim()); current = ""; }
+    else current += ch;
+  }
+  if (current.trim()) parts.push(current.trim());
+
+  const stops: FigmaGradientStop[] = [];
+  parts.forEach((p, i) => {
+    const m = p.match(/(rgba?\([^)]+\)|hsla?\([^)]+\)|#[0-9a-f]{3,8}|\b[a-z]+\b)\s*(?:(\d+(?:\.\d+)?)(%|px)?)?/i);
+    if (!m || !m[1]) return;
+    const color = parseColor(m[1]);
+    if (!color) return;
+    let pos: number;
+    if (m[2] !== undefined && m[3] === "%") {
+      pos = parseFloat(m[2]) / 100;
+    } else if (m[2] !== undefined && m[3] === "px") {
+      pos = parseFloat(m[2]) === 0 ? 0 : i / Math.max(parts.length - 1, 1);
+    } else if (parts.length === 1) {
+      pos = 0;
+    } else {
+      pos = i / (parts.length - 1);
+    }
+    stops.push({ color, position: Math.max(0, Math.min(1, pos)) });
+  });
+  const seen = new Set<number>();
+  return stops.filter((s) => {
+    const key = Math.round(s.position * 10000);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function extractGradientBody(raw: string, prefix: string): string | null {
+  if (!raw.startsWith(prefix + "(")) return null;
+  const start = prefix.length + 1;
+  let depth = 1;
+  for (let i = start; i < raw.length; i++) {
+    if (raw[i] === "(") depth++;
+    else if (raw[i] === ")") {
+      depth--;
+      if (depth === 0) return raw.slice(start, i);
+    }
+  }
+  return null;
+}
+
+function parseGradient(raw: string): FigmaPaint | null {
+  const linearBody = extractGradientBody(raw, "linear-gradient");
+  if (linearBody) {
+    const body = linearBody;
+    const firstComma = body.indexOf(",");
+    let angleDeg = 180;
+    let stopsRaw = body;
+    const head = body.slice(0, firstComma).trim();
+    if (/^-?\d+(?:\.\d+)?deg$/.test(head)) {
+      angleDeg = parseFloat(head);
+      stopsRaw = body.slice(firstComma + 1);
+    } else if (/^to\s/.test(head)) {
+      const dirMap: Record<string, number> = {
+        "to top": 0, "to right": 90, "to bottom": 180, "to left": 270,
+        "to top right": 45, "to right top": 45,
+        "to bottom right": 135, "to right bottom": 135,
+        "to bottom left": 225, "to left bottom": 225,
+        "to top left": 315, "to left top": 315,
+      };
+      angleDeg = dirMap[head.toLowerCase()] ?? 180;
+      stopsRaw = body.slice(firstComma + 1);
+    }
+    const stops = parseGradientStops(stopsRaw);
+    if (stops.length < 2) return null;
+    return { type: "GRADIENT_LINEAR", gradientStops: stops, gradientHandlePositions: angleToHandles(angleDeg) };
+  }
+
+  const radialBody = extractGradientBody(raw, "radial-gradient");
+  if (radialBody) {
+    const body = radialBody;
+    const firstComma = body.indexOf(",");
+    const head = body.slice(0, firstComma).trim();
+    const stopsRaw = head.match(/^(circle|ellipse|closest|farthest|at\s)/i) ? body.slice(firstComma + 1) : body;
+    const stops = parseGradientStops(stopsRaw);
+    if (stops.length < 2) return null;
+    const handles: [FigmaGradientHandle, FigmaGradientHandle, FigmaGradientHandle] = [
+      { x: 0.5, y: 0.5 }, { x: 1, y: 0.5 }, { x: 0.5, y: 1 },
+    ];
+    return { type: "GRADIENT_RADIAL", gradientStops: stops, gradientHandlePositions: handles };
+  }
+  return null;
+}
 
 function parseColor(input: string | undefined, tokens?: ClaudeBundle["tokens"]): FigmaColor | null {
   if (!input) return null;
@@ -130,6 +250,7 @@ function mapType(t: ClaudeNode["type"]): FigmaNode["type"] {
 
 interface AdapterCounters {
   gradient_skipped: number;
+  gradient_mapped: number;
   svg_outline_only: number;
   iframe_skipped: number;
   shadow_only_color_default: number;
@@ -153,6 +274,15 @@ function convertNode(
   if (fillColor) fills.push({ type: "SOLID", color: fillColor });
   if (n.src && (n.type === "IMAGE" || n.fit)) {
     fills.push({ type: "IMAGE", imageRef: n.src, scaleMode: n.fit ?? "FILL" });
+  }
+  if (n.gradient) {
+    const gradPaint = parseGradient(n.gradient);
+    if (gradPaint) {
+      fills.push(gradPaint);
+      counters.gradient_mapped++;
+    } else {
+      counters.gradient_skipped++;
+    }
   }
   if (fills.length) out.fills = fills;
 
@@ -191,7 +321,13 @@ function convertNode(
     }
   }
 
-  if (n.type === "SVG") counters.svg_outline_only++;
+  if (n.type === "SVG") {
+    if (n.svg) {
+      out.svgOuterHtml = n.svg;
+    } else {
+      counters.svg_outline_only++;
+    }
+  }
 
   if (n.children?.length) {
     out.children = n.children.map((c) => convertNode(c, tokens, counters));
@@ -204,27 +340,33 @@ export function bundleToFigma(bundle: ClaudeBundle): FigmaDocument {
   const started = Date.now();
   const counters: AdapterCounters = {
     gradient_skipped: 0,
+    gradient_mapped: 0,
     svg_outline_only: 0,
     iframe_skipped: 0,
     shadow_only_color_default: 0,
   };
   for (const w of bundle.warnings) {
-    if (w.kind === "bg_gradient_unmapped") counters.gradient_skipped = w.count;
     if (w.kind === "iframe_cross_origin") counters.iframe_skipped = w.count;
   }
 
+  const upstreamWarnings = bundle.warnings.filter((w) => w.kind !== "bg_gradient_unmapped");
   const children = bundle.tree.map((n) => convertNode(n, bundle.tokens, counters));
   const warnings = [
-    ...bundle.warnings,
+    ...upstreamWarnings,
     counters.svg_outline_only > 0 && {
       kind: "svg_outline_only_v0",
       count: counters.svg_outline_only,
       hint: "SVG nodes mapped to empty VECTOR shells (no path data). Phase 3 path traversal deferred.",
     },
+    counters.gradient_mapped > 0 && {
+      kind: "gradient_paint_mapped",
+      count: counters.gradient_mapped,
+      hint: "CSS gradients parsed to GRADIENT_LINEAR/GRADIENT_RADIAL paints with stops + handle positions.",
+    },
     counters.gradient_skipped > 0 && {
-      kind: "gradient_paint_deferred",
+      kind: "gradient_paint_failed",
       count: counters.gradient_skipped,
-      hint: "Gradients not emitted as GRADIENT_LINEAR paints. Phase 3 parser deferred.",
+      hint: "Gradient CSS string present but parser could not extract stops (conic/multi-position/edge syntax).",
     },
   ].filter((x): x is { kind: string; count: number; hint: string } => !!x);
 
