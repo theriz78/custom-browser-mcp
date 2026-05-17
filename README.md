@@ -146,6 +146,32 @@ src/
 
 Single Chromium persistent context shared across all 3 tools (factory in [`src/lib/browser.ts`](src/lib/browser.ts)). Profile: `out/.chromium-profile/` (override via `CBM_USER_DATA_DIR` env). Warm context ≈ 25% speedup vs cold launch.
 
+### Browser mode (3 options)
+
+Set via `CBM_BROWSER_MODE` env var. Defaults to `chromium`.
+
+| Mode | What | Pre-req | Use when |
+|---|---|---|---|
+| `chromium` (default) | Playwright-managed Chromium download (~92 MB once) | none | First install, CI, reproducible runs |
+| `chrome` | Use Google Chrome stable installed on machine | Chrome installed | Skip 92 MB download, auto-update via Chrome |
+| `cdp` | Connect to running Chrome via DevTools Protocol | Launch Chrome with `--remote-debugging-port=9222` | Share user cookies/sessions (logged-in IG/Gmail), anti-bot maximal |
+
+```bash
+# Mode chromium (default — managed download)
+bun run smoke https://example.com
+
+# Mode chrome (use system Chrome)
+CBM_BROWSER_MODE=chrome bun run smoke https://example.com
+
+# Mode cdp (connect to running Chrome with debug port)
+# Step 1: launch Chrome with debug port
+google-chrome --remote-debugging-port=9222
+# Step 2: run with CDP mode
+CBM_BROWSER_MODE=cdp CBM_CDP_URL=http://localhost:9222 bun run smoke https://example.com
+```
+
+CDP mode shares ALL browser state (cookies, localStorage, logged-in accounts) — useful for scraping behind login walls, but **privacy risk** : MCP sees all your tabs and sessions.
+
 ## Cost & performance
 
 Measured smoke baseline against Awwwards SOTD (1440×900, networkidle), Mac arm64:
