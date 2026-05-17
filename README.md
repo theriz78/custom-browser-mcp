@@ -1,6 +1,6 @@
-# custom-browser-mcp
+# eclectique-browser-mcp
 
-> MCP server that turns any live URL into a multi-output design bundle: a11y tree, design tokens, screenshot, Claude-consumable DSL, Figma REST JSON. Zero LLM API cost. Persistent Chromium context.
+> Eclectique Browser MCP — turns any live URL into a multi-output design bundle: a11y tree, design tokens, screenshot, Claude-consumable DSL, Figma REST JSON. Zero LLM API cost. Persistent Chromium context.
 
 [![MCP](https://img.shields.io/badge/MCP-1.29-blue)](https://modelcontextprotocol.io)
 [![Bun](https://img.shields.io/badge/Bun-1.3-fbf0df)](https://bun.sh)
@@ -101,16 +101,16 @@ bun run typecheck          # tsc --noEmit
 ```jsonc
 {
   "mcpServers": {
-    "custom-browser": {
+    "eclectique-browser": {
       "command": "bun",
       "args": ["run", "serve"],
-      "cwd": "/absolute/path/to/custom-browser-mcp"
+      "cwd": "/absolute/path/to/eclectique-browser-mcp"
     }
   }
 }
 ```
 
-Restart Claude Code. Verify with `/mcp` — should list `custom-browser` with 3 tools.
+Restart Claude Code. Verify with `/mcp` — should list `eclectique-browser` with 3 tools.
 
 ## Stack
 

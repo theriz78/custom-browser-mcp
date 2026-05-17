@@ -9,8 +9,8 @@ import { toClaude } from "./tools/to_claude.js";
 import { toFigma } from "./tools/to_figma.js";
 import { closeSharedContext } from "./lib/browser.js";
 
-const SERVER_NAME = "custom-browser-mcp";
-const SERVER_VERSION = "0.3.0";
+const SERVER_NAME = "eclectique-browser-mcp";
+const SERVER_VERSION = "0.4.0";
 
 const ANALYZE_PAGE_TOOL = {
   name: "analyze_page",
