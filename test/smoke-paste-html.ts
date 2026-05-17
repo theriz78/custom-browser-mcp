@@ -71,7 +71,7 @@ async function smokeHtmlFile() {
   await writeFile(htmlPath, SAMPLE_HTML);
 
   const t0 = Date.now();
-  const r1 = await toClaude({ html_path: htmlPath });
+  const r1 = await toClaude({ html_path: htmlPath, viewport: { width: 1280, height: 720 } });
   console.log(
     `  .html label=${r1.bundle.url} nodes=${r1.bundle.metrics.nodes} dur=${Date.now() - t0}ms`
   );
@@ -85,7 +85,7 @@ async function smokeHtmlFile() {
   });
 
   const t1 = Date.now();
-  const r2 = await toClaude({ html_path: zipPath });
+  const r2 = await toClaude({ html_path: zipPath, viewport: { width: 1280, height: 720 } });
   console.log(
     `  .zip label=${r2.bundle.url} nodes=${r2.bundle.metrics.nodes} dur=${Date.now() - t1}ms`
   );

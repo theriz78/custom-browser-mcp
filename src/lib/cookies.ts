@@ -1,4 +1,4 @@
-import type { BrowserContext, Page } from "playwright";
+import type { BrowserContext, Page } from "patchright";
 
 const CMP_ACCEPT_SELECTORS: string[] = [
   "#onetrust-accept-btn-handler",

@@ -1,4 +1,4 @@
-import type { Page } from "playwright";
+import type { Page } from "patchright";
 
 export interface ClaudeNode {
   id: string;

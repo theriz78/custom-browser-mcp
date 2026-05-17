@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { chromium } from "playwright";
+import { chromium } from "patchright";
 import { resolve } from "node:path";
 import { closeSharedContext } from "../lib/browser.js";
 import { assertSafeUrl } from "../lib/urlGuard.js";

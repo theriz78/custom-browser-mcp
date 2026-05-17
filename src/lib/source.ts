@@ -4,7 +4,7 @@ import { join, resolve, basename, dirname } from "node:path";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import type { Page } from "playwright";
+import type { Page } from "patchright";
 import { assertSafeUrl } from "./urlGuard.js";
 
 const ZIP_MAX_BYTES = 32 * 1024 * 1024;

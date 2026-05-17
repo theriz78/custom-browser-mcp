@@ -1,4 +1,4 @@
-import type { Page } from "playwright";
+import type { Page } from "patchright";
 import { mkdir, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 

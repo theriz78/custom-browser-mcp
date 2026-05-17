@@ -1,4 +1,4 @@
-import type { Page } from "playwright";
+import type { Page } from "patchright";
 
 function countYamlNodes(yaml: string): number {
   let n = 0;

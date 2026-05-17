@@ -1,4 +1,4 @@
-import { chromium, type Browser, type BrowserContext } from "playwright";
+import { chromium, type Browser, type BrowserContext } from "patchright";
 import { resolve } from "node:path";
 
 const OUT_DIR = resolve(import.meta.dir, "..", "..", "out");
