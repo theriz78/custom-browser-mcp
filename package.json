@@ -1,0 +1,27 @@
+{
+  "name": "custom-browser-mcp",
+  "version": "0.3.0",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "serve": "bun src/server.ts",
+    "smoke": "bun test/smoke.ts",
+    "smoke:claude": "bun test/smoke-claude.ts",
+    "smoke:figma": "bun test/smoke-figma.ts",
+    "consolidate": "bun test/consolidate.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "playwright": "^1.60.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  }
+}

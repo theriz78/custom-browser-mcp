@@ -1,0 +1,1977 @@
+schema: cbm/htmltoclaude/v0
+viewport:
+  w: 1440
+  h: 900
+tokens:
+  colors:
+    c0: rgb(34, 34, 34)
+    c1: rgb(255, 255, 255)
+    c2: rgb(248, 248, 248)
+    c3: rgb(237, 237, 237)
+    c4: rgba(34, 34, 34, 0.8)
+    c5: rgba(0, 0, 0, 0.7)
+  fonts:
+    f0:
+      family: Inter Tight
+      weights:
+        - "300"
+        - "400"
+        - "500"
+        - "600"
+  spacing: []
+  type:
+    - 10
+    - 14
+    - 16
+    - 19
+tree:
+  - id: n0
+    type: FRAME
+    box:
+      - 0
+      - 0
+      - 1440
+      - 1419
+    fill: c2
+    font: f0
+    clip: true
+    children:
+      - id: n1
+        type: GROUP
+        box:
+          - 0
+          - 0
+          - 1440
+          - 1419
+        font: f0
+        children:
+          - id: n2
+            type: FRAME
+            box:
+              - 0
+              - 0
+              - 1440
+              - 50
+            fill: c3
+            font: f0
+            clip: true
+            children:
+              - id: n3
+                type: GROUP
+                box:
+                  - -40
+                  - 0
+                  - 4696
+                  - 50
+                font: f0
+                children:
+                  - id: n4
+                    type: GROUP
+                    box:
+                      - -40
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n5
+                        type: TEXT
+                        box:
+                          - -28
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n6
+                        type: SVG
+                        box:
+                          - 101
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n13
+                        type: TEXT
+                        box:
+                          - 137
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n14
+                    type: GROUP
+                    box:
+                      - 387
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n15
+                        type: TEXT
+                        box:
+                          - 399
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n16
+                        type: SVG
+                        box:
+                          - 528
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n23
+                        type: TEXT
+                        box:
+                          - 564
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n24
+                    type: GROUP
+                    box:
+                      - 814
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n25
+                        type: TEXT
+                        box:
+                          - 826
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n26
+                        type: SVG
+                        box:
+                          - 955
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n33
+                        type: TEXT
+                        box:
+                          - 991
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n34
+                    type: GROUP
+                    box:
+                      - 1241
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n35
+                        type: TEXT
+                        box:
+                          - 1253
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n36
+                        type: SVG
+                        box:
+                          - 1382
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n43
+                        type: TEXT
+                        box:
+                          - 1418
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n44
+                    type: GROUP
+                    box:
+                      - 1668
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n45
+                        type: TEXT
+                        box:
+                          - 1680
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n46
+                        type: SVG
+                        box:
+                          - 1809
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n53
+                        type: TEXT
+                        box:
+                          - 1845
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n54
+                    type: GROUP
+                    box:
+                      - 2095
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n55
+                        type: TEXT
+                        box:
+                          - 2107
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n56
+                        type: SVG
+                        box:
+                          - 2236
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n63
+                        type: TEXT
+                        box:
+                          - 2271
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n64
+                    type: GROUP
+                    box:
+                      - 2522
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n65
+                        type: TEXT
+                        box:
+                          - 2534
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n66
+                        type: SVG
+                        box:
+                          - 2663
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n73
+                        type: TEXT
+                        box:
+                          - 2698
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n74
+                    type: GROUP
+                    box:
+                      - 2949
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n75
+                        type: TEXT
+                        box:
+                          - 2961
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n76
+                        type: SVG
+                        box:
+                          - 3090
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n83
+                        type: TEXT
+                        box:
+                          - 3125
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n84
+                    type: GROUP
+                    box:
+                      - 3376
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n85
+                        type: TEXT
+                        box:
+                          - 3388
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n86
+                        type: SVG
+                        box:
+                          - 3517
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n93
+                        type: TEXT
+                        box:
+                          - 3552
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n94
+                    type: GROUP
+                    box:
+                      - 3803
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n95
+                        type: TEXT
+                        box:
+                          - 3815
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n96
+                        type: SVG
+                        box:
+                          - 3944
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n103
+                        type: TEXT
+                        box:
+                          - 3979
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n104
+                    type: GROUP
+                    box:
+                      - 4230
+                      - 11
+                      - 427
+                      - 28
+                    font: f0
+                    children:
+                      - id: n105
+                        type: TEXT
+                        box:
+                          - 4242
+                          - 16
+                          - 114
+                          - 17
+                        chars: The Creative Pass
+                        font: f0
+                        size: 14
+                        weight: "600"
+                        color: c0
+                      - id: n106
+                        type: SVG
+                        box:
+                          - 4371
+                          - 14
+                          - 20
+                          - 25
+                        font: f0
+                        clip: true
+                      - id: n113
+                        type: TEXT
+                        box:
+                          - 4406
+                          - 16
+                          - 238
+                          - 17
+                        chars: Watch all courses for just €11.50/month
+                        font: f0
+                        size: 14
+                        weight: "300"
+                        color: c0
+                  - id: n114
+                    type: GROUP
+                    box:
+                      - -40
+                      - 0
+                      - 4696
+                      - 50
+                    role: link
+                    z: 1
+                    font: f0
+          - id: n115
+            type: GROUP
+            box:
+              - 0
+              - 58
+              - 1440
+              - 54
+            role: banner
+            font: f0
+            children:
+              - id: n116
+                type: GROUP
+                box:
+                  - 52
+                  - 58
+                  - 1336
+                  - 54
+                font: f0
+                children:
+                  - id: n117
+                    type: GROUP
+                    box:
+                      - 52
+                      - 58
+                      - 1336
+                      - 54
+                    font: f0
+                    children:
+                      - id: n118
+                        type: GROUP
+                        box:
+                          - 52
+                          - 58
+                          - 1336
+                          - 54
+                        z: 3
+                        font: f0
+                        children:
+                          - id: n119
+                            type: GROUP
+                            box:
+                              - 52
+                              - 58
+                              - 1336
+                              - 54
+                            font: f0
+                            radius:
+                              - 8
+                              - 8
+                              - 8
+                              - 8
+                            children:
+                              - id: n120
+                                type: GROUP
+                                box:
+                                  - 62
+                                  - 77
+                                  - 30
+                                  - 16
+                                role: link
+                                font: f0
+                                children:
+                                  - id: n121
+                                    type: SVG
+                                    box:
+                                      - 62
+                                      - 77
+                                      - 30
+                                      - 16
+                                    font: f0
+                                    clip: true
+                              - id: n123
+                                type: GROUP
+                                box:
+                                  - 148
+                                  - 58
+                                  - 380
+                                  - 54
+                                role: navigation
+                                font: f0
+                                children:
+                                  - id: n124
+                                    type: GROUP
+                                    box:
+                                      - 148
+                                      - 58
+                                      - 380
+                                      - 54
+                                    role: list
+                                    font: f0
+                                    children:
+                                      - id: n125
+                                        type: GROUP
+                                        box:
+                                          - 148
+                                          - 58
+                                          - 80
+                                          - 54
+                                        role: listitem
+                                        font: f0
+                                        children:
+                                          - id: n126
+                                            type: GROUP
+                                            box:
+                                              - 158
+                                              - 58
+                                              - 60
+                                              - 54
+                                            font: f0
+                                            children:
+                                              - id: n127
+                                                type: SVG
+                                                box:
+                                                  - 210
+                                                  - 81
+                                                  - 8
+                                                  - 8
+                                                font: f0
+                                                clip: true
+                                      - id: n129
+                                        type: GROUP
+                                        box:
+                                          - 228
+                                          - 58
+                                          - 77
+                                          - 54
+                                        role: listitem
+                                        font: f0
+                                        children:
+                                          - id: n130
+                                            type: TEXT
+                                            box:
+                                              - 238
+                                              - 58
+                                              - 57
+                                              - 54
+                                            role: link
+                                            chars: Directory
+                                            font: f0
+                                            size: 14
+                                            weight: "500"
+                                            color: c0
+                                      - id: n131
+                                        type: GROUP
+                                        box:
+                                          - 305
+                                          - 58
+                                          - 111
+                                          - 54
+                                        role: listitem
+                                        font: f0
+                                        children:
+                                          - id: n132
+                                            type: GROUP
+                                            box:
+                                              - 315
+                                              - 58
+                                              - 91
+                                              - 54
+                                            role: link
+                                            font: f0
+                                            children:
+                                              - id: n133
+                                                type: FRAME
+                                                box:
+                                                  - 377
+                                                  - 77
+                                                  - 28
+                                                  - 16
+                                                fill: c0
+                                                font: f0
+                                                radius:
+                                                  - 4
+                                                  - 4
+                                                  - 4
+                                                  - 4
+                                                clip: true
+                                                children:
+                                                  - id: n134
+                                                    type: TEXT
+                                                    box:
+                                                      - 381
+                                                      - 77
+                                                      - 20
+                                                      - 17
+                                                    z: 1
+                                                    chars: New
+                                                    font: f0
+                                                    size: 10
+                                                    weight: "500"
+                                                    color: c1
+                                      - id: n135
+                                        type: GROUP
+                                        box:
+                                          - 415
+                                          - 58
+                                          - 50
+                                          - 54
+                                        role: listitem
+                                        font: f0
+                                        children:
+                                          - id: n136
+                                            type: TEXT
+                                            box:
+                                              - 425
+                                              - 58
+                                              - 30
+                                              - 54
+                                            role: link
+                                            chars: Jobs
+                                            font: f0
+                                            size: 14
+                                            weight: "500"
+                                            color: c0
+                                      - id: n137
+                                        type: GROUP
+                                        box:
+                                          - 465
+                                          - 58
+                                          - 63
+                                          - 54
+                                        role: listitem
+                                        font: f0
+                                        children:
+                                          - id: n138
+                                            type: TEXT
+                                            box:
+                                              - 475
+                                              - 58
+                                              - 43
+                                              - 54
+                                            role: link
+                                            chars: Market
+                                            font: f0
+                                            size: 14
+                                            weight: "500"
+                                            color: c0
+                              - id: n139
+                                type: GROUP
+                                box:
+                                  - 552
+                                  - 64
+                                  - 448
+                                  - 42
+                                font: f0
+                                children:
+                                  - id: n140
+                                    type: FRAME
+                                    box:
+                                      - 552
+                                      - 64
+                                      - 448
+                                      - 42
+                                    fill: c3
+                                    font: f0
+                                    radius:
+                                      - 8
+                                      - 8
+                                      - 8
+                                      - 8
+                                    children:
+                                      - id: n141
+                                        type: GROUP
+                                        box:
+                                          - 552
+                                          - 64
+                                          - 448
+                                          - 42
+                                        font: f0
+                                        radius:
+                                          - 8
+                                          - 0
+                                          - 0
+                                          - 8
+                                        children:
+                                          - id: n142
+                                            type: GROUP
+                                            box:
+                                              - 568
+                                              - 64
+                                              - 14
+                                              - 42
+                                            role: button
+                                            font: f0
+                                            children:
+                                              - id: n143
+                                                type: SVG
+                                                box:
+                                                  - 568
+                                                  - 78
+                                                  - 14
+                                                  - 14
+                                                font: f0
+                                                clip: true
+                                          - id: n145
+                                            type: INPUT
+                                            box:
+                                              - 552
+                                              - 64
+                                              - 448
+                                              - 42
+                                            role: input
+                                            font: f0
+                                            clip: true
+                              - id: n146
+                                type: GROUP
+                                box:
+                                  - 1021
+                                  - 64
+                                  - 361
+                                  - 42
+                                font: f0
+                                children:
+                                  - id: n147
+                                    type: GROUP
+                                    box:
+                                      - 1021
+                                      - 64
+                                      - 119
+                                      - 42
+                                    font: f0
+                                    children:
+                                      - id: n148
+                                        type: TEXT
+                                        box:
+                                          - 1021
+                                          - 71
+                                          - 38
+                                          - 28
+                                        chars: Log in
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                                      - id: n149
+                                        type: TEXT
+                                        box:
+                                          - 1074
+                                          - 71
+                                          - 49
+                                          - 28
+                                        chars: Sign Up
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                                  - id: n150
+                                    type: GROUP
+                                    box:
+                                      - 1151
+                                      - 64
+                                      - 231
+                                      - 42
+                                    font: f0
+                                    children:
+                                      - id: n151
+                                        type: TEXT
+                                        box:
+                                          - 1151
+                                          - 64
+                                          - 80
+                                          - 42
+                                        role: link
+                                        fill: c0
+                                        chars: Be Pro
+                                        font: f0
+                                        size: 14
+                                        weight: "500"
+                                        color: c1
+                                        radius:
+                                          - 8
+                                          - 8
+                                          - 8
+                                          - 8
+                                      - id: n152
+                                        type: TEXT
+                                        box:
+                                          - 1243
+                                          - 64
+                                          - 139
+                                          - 42
+                                        role: link
+                                        chars: Submit Website
+                                        font: f0
+                                        size: 14
+                                        weight: "500"
+                                        color: c0
+                                        radius:
+                                          - 8
+                                          - 8
+                                          - 8
+                                          - 8
+                                        border:
+                                          w: 1
+                                          color: c0
+          - id: n153
+            type: GROUP
+            box:
+              - 0
+              - 112
+              - 1440
+              - 900
+            role: region
+            font: f0
+            children:
+              - id: n154
+                type: GROUP
+                box:
+                  - 0
+                  - 112
+                  - 1440
+                  - 900
+                font: f0
+                children:
+                  - id: n155
+                    type: IMAGE
+                    box:
+                      - 0
+                      - 112
+                      - 1440
+                      - 900
+                    role: img
+                    z: -1
+                    font: f0
+                    src: https://assets.awwwards.com/assets/redesign/images/pages/404/bg.jpg
+                    fit: FILL
+                    clip: true
+                  - id: n156
+                    type: GROUP
+                    box:
+                      - 0
+                      - 112
+                      - 1440
+                      - 222
+                    font: f0
+                    children:
+                      - id: n157
+                        type: GROUP
+                        box:
+                          - 70
+                          - 199
+                          - 72
+                          - 47
+                        role: link
+                        font: f0
+                        children:
+                          - id: n158
+                            type: SVG
+                            box:
+                              - 70
+                              - 199
+                              - 72
+                              - 38
+                            font: f0
+                            clip: true
+                      - id: n160
+                        type: SVG
+                        box:
+                          - 166
+                          - 182
+                          - 82
+                          - 82
+                        font: f0
+                        clip: true
+              - id: n166
+                type: GROUP
+                box:
+                  - 0
+                  - 798
+                  - 1440
+                  - 72
+                z: 9
+                font: f0
+                children:
+                  - id: n167
+                    type: GROUP
+                    box:
+                      - 52
+                      - 798
+                      - 1336
+                      - 72
+                    font: f0
+                    children:
+                      - id: n168
+                        type: GROUP
+                        box:
+                          - 52
+                          - 798
+                          - 1336
+                          - 72
+                        font: f0
+                        children:
+                          - id: n169
+                            type: FRAME
+                            box:
+                              - 684
+                              - 798
+                              - 72
+                              - 72
+                            fill: c4
+                            font: f0
+                            radius:
+                              - 12
+                              - 12
+                              - 12
+                              - 12
+                            children:
+                              - id: n170
+                                type: GROUP
+                                box:
+                                  - 690
+                                  - 804
+                                  - 60
+                                  - 60
+                                font: f0
+                                children:
+                                  - id: n171
+                                    type: GROUP
+                                    box:
+                                      - 690
+                                      - 804
+                                      - 60
+                                      - 60
+                                    font: f0
+                                    children:
+                                      - id: n172
+                                        type: FRAME
+                                        box:
+                                          - 690
+                                          - 804
+                                          - 60
+                                          - 60
+                                        fill: c0
+                                        font: f0
+                                        radius:
+                                          - 8
+                                          - 8
+                                          - 8
+                                          - 8
+                                        clip: true
+                                        children:
+                                          - id: n173
+                                            type: GROUP
+                                            box:
+                                              - 690
+                                              - 804
+                                              - 60
+                                              - 60
+                                            role: link
+                                            font: f0
+                                            children:
+                                              - id: n174
+                                                type: SVG
+                                                box:
+                                                  - 705
+                                                  - 826
+                                                  - 30
+                                                  - 16
+                                                font: f0
+                                                clip: true
+          - id: n176
+            type: GROUP
+            box:
+              - 0
+              - 1012
+              - 1440
+              - 407
+            role: contentinfo
+            font: f0
+            children:
+              - id: n177
+                type: GROUP
+                box:
+                  - 52
+                  - 1012
+                  - 1336
+                  - 287
+                font: f0
+                children:
+                  - id: n178
+                    type: GROUP
+                    box:
+                      - 52
+                      - 1012
+                      - 1336
+                      - 159
+                    font: f0
+                    children:
+                      - id: n179
+                        type: GROUP
+                        box:
+                          - 52
+                          - 1015
+                          - 30
+                          - 16
+                        font: f0
+                        children:
+                          - id: n180
+                            type: SVG
+                            box:
+                              - 52
+                              - 1015
+                              - 30
+                              - 16
+                            font: f0
+                            clip: true
+                      - id: n182
+                        type: GROUP
+                        box:
+                          - 52
+                          - 1089
+                          - 1336
+                          - 82
+                        font: f0
+                        children:
+                          - id: n183
+                            type: GROUP
+                            box:
+                              - 52
+                              - 1089
+                              - 1336
+                              - 82
+                            font: f0
+                            children:
+                              - id: n184
+                                type: GROUP
+                                box:
+                                  - 52
+                                  - 1089
+                                  - 248
+                                  - 82
+                                role: list
+                                font: f0
+                                children:
+                                  - id: n185
+                                    type: GROUP
+                                    box:
+                                      - 52
+                                      - 1089
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n186
+                                        type: TEXT
+                                        box:
+                                          - 52
+                                          - 1087
+                                          - 59
+                                          - 17
+                                        role: link
+                                        chars: Websites
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                                  - id: n187
+                                    type: GROUP
+                                    box:
+                                      - 52
+                                      - 1123
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n188
+                                        type: TEXT
+                                        box:
+                                          - 52
+                                          - 1121
+                                          - 71
+                                          - 17
+                                        role: link
+                                        chars: Collections
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                                  - id: n189
+                                    type: GROUP
+                                    box:
+                                      - 52
+                                      - 1157
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n190
+                                        type: TEXT
+                                        box:
+                                          - 52
+                                          - 1155
+                                          - 59
+                                          - 17
+                                        role: link
+                                        chars: Elements
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                              - id: n191
+                                type: GROUP
+                                box:
+                                  - 324
+                                  - 1089
+                                  - 248
+                                  - 82
+                                role: list
+                                font: f0
+                                children:
+                                  - id: n192
+                                    type: GROUP
+                                    box:
+                                      - 324
+                                      - 1089
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n193
+                                        type: TEXT
+                                        box:
+                                          - 324
+                                          - 1087
+                                          - 60
+                                          - 17
+                                        role: link
+                                        chars: Academy
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                                  - id: n194
+                                    type: GROUP
+                                    box:
+                                      - 324
+                                      - 1123
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n195
+                                        type: TEXT
+                                        box:
+                                          - 324
+                                          - 1121
+                                          - 31
+                                          - 17
+                                        role: link
+                                        chars: Jobs
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                                  - id: n196
+                                    type: GROUP
+                                    box:
+                                      - 324
+                                      - 1157
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n197
+                                        type: TEXT
+                                        box:
+                                          - 324
+                                          - 1155
+                                          - 44
+                                          - 17
+                                        role: link
+                                        chars: Market
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                              - id: n198
+                                type: GROUP
+                                box:
+                                  - 596
+                                  - 1089
+                                  - 248
+                                  - 82
+                                role: list
+                                font: f0
+                                children:
+                                  - id: n199
+                                    type: GROUP
+                                    box:
+                                      - 596
+                                      - 1089
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n200
+                                        type: TEXT
+                                        box:
+                                          - 596
+                                          - 1087
+                                          - 58
+                                          - 17
+                                        role: link
+                                        chars: Directory
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                                  - id: n201
+                                    type: GROUP
+                                    box:
+                                      - 596
+                                      - 1123
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n202
+                                        type: TEXT
+                                        box:
+                                          - 596
+                                          - 1121
+                                          - 81
+                                          - 17
+                                        role: link
+                                        chars: Conferences
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                              - id: n203
+                                type: GROUP
+                                box:
+                                  - 868
+                                  - 1089
+                                  - 248
+                                  - 82
+                                role: list
+                                font: f0
+                                children:
+                                  - id: n204
+                                    type: GROUP
+                                    box:
+                                      - 868
+                                      - 1089
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n205
+                                        type: TEXT
+                                        box:
+                                          - 868
+                                          - 1087
+                                          - 33
+                                          - 17
+                                        role: link
+                                        chars: FAQs
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                                  - id: n206
+                                    type: GROUP
+                                    box:
+                                      - 868
+                                      - 1123
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n207
+                                        type: TEXT
+                                        box:
+                                          - 868
+                                          - 1121
+                                          - 58
+                                          - 17
+                                        role: link
+                                        chars: About Us
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                                  - id: n208
+                                    type: GROUP
+                                    box:
+                                      - 868
+                                      - 1157
+                                      - 248
+                                      - 14
+                                    role: listitem
+                                    font: f0
+                                    children:
+                                      - id: n209
+                                        type: TEXT
+                                        box:
+                                          - 868
+                                          - 1155
+                                          - 71
+                                          - 17
+                                        role: link
+                                        chars: Contact Us
+                                        font: f0
+                                        size: 14
+                                        weight: "600"
+                                        color: c0
+                  - id: n210
+                    type: FRAME
+                    box:
+                      - 52
+                      - 1228
+                      - 1336
+                      - 71
+                    font: f0
+                    fit: FILL
+                    children:
+                      - id: n211
+                        type: GROUP
+                        box:
+                          - 52
+                          - 1271
+                          - 291
+                          - 28
+                        font: f0
+                        children:
+                          - id: n212
+                            type: GROUP
+                            box:
+                              - 52
+                              - 1271
+                              - 291
+                              - 28
+                            role: list
+                            font: f0
+                            children:
+                              - id: n213
+                                type: GROUP
+                                box:
+                                  - 52
+                                  - 1271
+                                  - 87
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n214
+                                    type: TEXT
+                                    box:
+                                      - 52
+                                      - 1276
+                                      - 87
+                                      - 17
+                                    role: link
+                                    chars: Cookies Policy
+                                    font: f0
+                                    size: 14
+                                    color: c0
+                              - id: n215
+                                type: GROUP
+                                box:
+                                  - 163
+                                  - 1271
+                                  - 73
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n216
+                                    type: TEXT
+                                    box:
+                                      - 163
+                                      - 1276
+                                      - 73
+                                      - 17
+                                    role: link
+                                    chars: Legal Terms
+                                    font: f0
+                                    size: 14
+                                    color: c0
+                              - id: n217
+                                type: GROUP
+                                box:
+                                  - 260
+                                  - 1271
+                                  - 82
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n218
+                                    type: TEXT
+                                    box:
+                                      - 260
+                                      - 1276
+                                      - 82
+                                      - 17
+                                    role: link
+                                    chars: Privacy Policy
+                                    font: f0
+                                    size: 14
+                                    color: c0
+                      - id: n219
+                        type: GROUP
+                        box:
+                          - 806
+                          - 1271
+                          - 582
+                          - 28
+                        font: f0
+                        children:
+                          - id: n220
+                            type: GROUP
+                            box:
+                              - 806
+                              - 1271
+                              - 582
+                              - 28
+                            role: list
+                            font: f0
+                            children:
+                              - id: n221
+                                type: GROUP
+                                box:
+                                  - 806
+                                  - 1271
+                                  - 58
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n222
+                                    type: TEXT
+                                    box:
+                                      - 806
+                                      - 1276
+                                      - 58
+                                      - 17
+                                    chars: "Connect:"
+                                    font: f0
+                                    size: 14
+                                    weight: "600"
+                                    color: c0
+                              - id: n223
+                                type: GROUP
+                                box:
+                                  - 888
+                                  - 1271
+                                  - 60
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n224
+                                    type: TEXT
+                                    box:
+                                      - 888
+                                      - 1276
+                                      - 60
+                                      - 17
+                                    role: link
+                                    chars: Instagram
+                                    font: f0
+                                    size: 14
+                                    color: c0
+                              - id: n225
+                                type: GROUP
+                                box:
+                                  - 972
+                                  - 1271
+                                  - 50
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n226
+                                    type: TEXT
+                                    box:
+                                      - 972
+                                      - 1276
+                                      - 50
+                                      - 17
+                                    role: link
+                                    chars: LinkedIn
+                                    font: f0
+                                    size: 14
+                                    color: c0
+                              - id: n227
+                                type: GROUP
+                                box:
+                                  - 1046
+                                  - 1271
+                                  - 42
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n228
+                                    type: TEXT
+                                    box:
+                                      - 1046
+                                      - 1276
+                                      - 42
+                                      - 17
+                                    role: link
+                                    chars: Twitter
+                                    font: f0
+                                    size: 14
+                                    color: c0
+                              - id: n229
+                                type: GROUP
+                                box:
+                                  - 1112
+                                  - 1271
+                                  - 60
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n230
+                                    type: TEXT
+                                    box:
+                                      - 1112
+                                      - 1276
+                                      - 60
+                                      - 17
+                                    role: link
+                                    chars: Facebook
+                                    font: f0
+                                    size: 14
+                                    color: c0
+                              - id: n231
+                                type: GROUP
+                                box:
+                                  - 1196
+                                  - 1271
+                                  - 52
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n232
+                                    type: TEXT
+                                    box:
+                                      - 1196
+                                      - 1276
+                                      - 52
+                                      - 17
+                                    role: link
+                                    chars: YouTube
+                                    font: f0
+                                    size: 14
+                                    color: c0
+                              - id: n233
+                                type: GROUP
+                                box:
+                                  - 1272
+                                  - 1271
+                                  - 39
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n234
+                                    type: TEXT
+                                    box:
+                                      - 1272
+                                      - 1276
+                                      - 39
+                                      - 17
+                                    role: link
+                                    chars: TikTok
+                                    font: f0
+                                    size: 14
+                                    color: c0
+                              - id: n235
+                                type: GROUP
+                                box:
+                                  - 1335
+                                  - 1271
+                                  - 53
+                                  - 28
+                                role: listitem
+                                font: f0
+                                children:
+                                  - id: n236
+                                    type: TEXT
+                                    box:
+                                      - 1335
+                                      - 1276
+                                      - 53
+                                      - 17
+                                    role: link
+                                    chars: Pinterest
+                                    font: f0
+                                    size: 14
+                                    color: c0
+      - id: n237
+        type: FRAME
+        box:
+          - 0
+          - 0
+          - 1440
+          - 900
+        fill: c5
+        z: 10
+        font: f0
+        clip: true
+        children:
+          - id: n238
+            type: GROUP
+            box:
+              - 300
+              - 250
+              - 840
+              - 400
+            font: f0
+            children:
+              - id: n239
+                type: FRAME
+                box:
+                  - 300
+                  - 250
+                  - 840
+                  - 400
+                fill: c2
+                font: f0
+                radius:
+                  - 14
+                  - 14
+                  - 14
+                  - 14
+                children:
+                  - id: n240
+                    type: GROUP
+                    box:
+                      - 343
+                      - 293
+                      - 754
+                      - 313
+                    font: f0
+                    children:
+                      - id: n241
+                        type: GROUP
+                        box:
+                          - 343
+                          - 293
+                          - 754
+                          - 203
+                        font: f0
+                        children:
+                          - id: n242
+                            type: GROUP
+                            box:
+                              - 343
+                              - 293
+                              - 754
+                              - 203
+                            font: f0
+                            children:
+                              - id: n243
+                                type: GROUP
+                                box:
+                                  - 343
+                                  - 293
+                                  - 754
+                                  - 203
+                                font: f0
+                                children:
+                                  - id: n244
+                                    type: GROUP
+                                    box:
+                                      - 343
+                                      - 293
+                                      - 754
+                                      - 28
+                                    font: f0
+                                    children:
+                                      - id: n245
+                                        type: TEXT
+                                        box:
+                                          - 343
+                                          - 295
+                                          - 127
+                                          - 24
+                                        chars: Cookies Policy
+                                        font: f0
+                                        size: 19
+                                        weight: "600"
+                                        color: c0
+                                  - id: n246
+                                    type: GROUP
+                                    box:
+                                      - 343
+                                      - 341
+                                      - 754
+                                      - 156
+                                    font: f0
+                                    children:
+                                      - id: n247
+                                        type: TEXT
+                                        box:
+                                          - 343
+                                          - 341
+                                          - 754
+                                          - 56
+                                        chars: We use our own cookies, as well as those of third parties, for individual
+                                          as well as repeated sessions, in order
+                                          to make the navigation of our website
+                                          easy and safe for our users.
+                                        font: f0
+                                        size: 16
+                                        weight: "300"
+                                        color: c0
+                                      - id: n248
+                                        type: GROUP
+                                        box:
+                                          - 343
+                                          - 413
+                                          - 754
+                                          - 84
+                                        font: f0
+                                        children:
+                                          - id: n249
+                                            type: GROUP
+                                            box:
+                                              - 537
+                                              - 473
+                                              - 97
+                                              - 20
+                                            font: f0
+                                            children:
+                                              - id: n250
+                                                type: TEXT
+                                                box:
+                                                  - 537
+                                                  - 475
+                                                  - 97
+                                                  - 16
+                                                role: link
+                                                chars: Cookie Policy
+                                                font: f0
+                                                size: 16
+                                                weight: "600"
+                                                color: c0
+                      - id: n251
+                        type: GROUP
+                        box:
+                          - 343
+                          - 547
+                          - 754
+                          - 60
+                        font: f0
+                        children:
+                          - id: n252
+                            type: GROUP
+                            box:
+                              - 343
+                              - 547
+                              - 579
+                              - 60
+                            font: f0
+                            children:
+                              - id: n253
+                                type: TEXT
+                                box:
+                                  - 343
+                                  - 547
+                                  - 165
+                                  - 60
+                                fill: c0
+                                chars: Accept all
+                                font: f0
+                                size: 16
+                                weight: "300"
+                                color: c1
+                                radius:
+                                  - 8
+                                  - 8
+                                  - 8
+                                  - 8
+                          - id: n254
+                            type: GROUP
+                            box:
+                              - 922
+                              - 570
+                              - 175
+                              - 14
+                            font: f0
+                            children:
+                              - id: n255
+                                type: TEXT
+                                box:
+                                  - 922
+                                  - 570
+                                  - 56
+                                  - 14
+                                chars: Reject all
+                                font: f0
+                                size: 14
+                                weight: "600"
+                                color: c0
+                              - id: n256
+                                type: TEXT
+                                box:
+                                  - 990
+                                  - 570
+                                  - 107
+                                  - 14
+                                chars: Manage Settings
+                                font: f0
+                                size: 14
+                                weight: "600"
+                                color: c0
+warnings:
+  - kind: pruned_empty_groups
+    count: 77
+    hint: Dropped 77 empty GROUP nodes (no fill/chars/role/src/border/radius/clip
+      and no kept descendants). Kept 180.
+  - kind: bg_gradient_unmapped
+    count: 1
+    hint: CSS gradients flagged; Phase 3 GradientPaint mapping deferred
+url: https://www.awwwards.com/sites_of_the_day
+captured_at: 2026-05-17T02:03:49.985Z
+metrics:
+  nodes: 180
+  approx_tokens: 4588
+  duration_ms: 1670

@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "url": "https://www.awwwards.com/sites_of_the_day",
+  "snapshot_id": "cbm-1778981128485-2cb063fd382ef557",
+  "fetched_at": "2026-05-17T01:25:28.485Z",
+  "duration_ms": 6546,
+  "outputs_requested": ["a11y", "tokens", "screenshot"],
+  "a11y_node_count": 159,
+  "a11y_approx_tokens": 1107,
+  "tokens": {
+    "colors_top": [
+      { "value": "rgb(34, 34, 34)", "count": 511, "confidence": "high" },
+      { "value": "rgb(255, 255, 255)", "count": 62, "confidence": "medium" },
+      { "value": "rgb(0, 0, 0)", "count": 32, "confidence": "medium" }
+    ],
+    "fonts": [
+      { "family": "Inter Tight", "weights": ["400", "500", "700"], "sample_count": 1842 },
+      { "family": "Times", "weights": ["400"], "sample_count": 12 }
+    ],
+    "spacing_scale": [0, 1, 2, 4, 6, 8],
+    "type_scale_px_count": 9
+  },
+  "screenshot": {
+    "path": "out/screenshots/cbm-1778981128485-2cb063fd382ef557.png",
+    "bytes": 453677,
+    "viewport": { "width": 1440, "height": 900 },
+    "full_page": true
+  },
+  "warnings": [],
+  "cost_estimate_usd": 0.0,
+  "notes": "Phase 1 MVP smoke test 2026-05-17 — 100% local Chromium, zero LLM API. Target $0.05/page achieved at $0."
+}
