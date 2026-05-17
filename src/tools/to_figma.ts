@@ -19,8 +19,13 @@ export type ToFigmaInput = z.infer<typeof ToFigmaInput>;
 
 export const closeShared = closeSharedContext;
 
+export type FigmaDocumentWithCookies = FigmaDocument & {
+  cookie_consent?: CookieConsentLog;
+  cookies_cleared?: boolean;
+};
+
 export interface ToFigmaResult {
-  document: FigmaDocument & { cookie_consent?: CookieConsentLog; cookies_cleared?: boolean };
+  document: FigmaDocumentWithCookies;
   rendered: string;
 }
 
@@ -41,13 +46,11 @@ export async function toFigma(rawInput: unknown): Promise<ToFigmaResult> {
   const started = Date.now();
   const ctx = await getSharedContext(input.viewport);
   const page = await ctx.newPage();
-  let cookieLog: CookieConsentLog | undefined;
-  let cookiesCleared = false;
+  let document: FigmaDocumentWithCookies | null = null;
   try {
     await page.goto(input.url, { waitUntil: input.wait_until, timeout: input.timeout_ms });
-    if (input.cookie_consent === "auto") {
-      cookieLog = await acceptCookieConsent(page);
-    }
+    const cookieLog =
+      input.cookie_consent === "auto" ? await acceptCookieConsent(page) : undefined;
     const partial = await extractClaudeBundle(page, input.viewport);
     const nodeCount = countNodes(partial.tree);
     const approxText = JSON.stringify(partial.tree);
@@ -61,22 +64,21 @@ export async function toFigma(rawInput: unknown): Promise<ToFigmaResult> {
         duration_ms: Date.now() - started,
       },
     };
-    const document = bundleToFigma(claude);
-    const enriched = {
-      ...document,
+    document = {
+      ...bundleToFigma(claude),
       ...(cookieLog ? { cookie_consent: cookieLog } : {}),
       cookies_cleared: false,
     };
-    const rendered = JSON.stringify(enriched, null, 2);
-    return { document: enriched, rendered };
   } finally {
-    if (input.clear_cookies_after && process.env.CBM_BROWSER_MODE !== "cdp") {
+    if (document && input.clear_cookies_after && process.env.CBM_BROWSER_MODE !== "cdp") {
       try {
         await clearCookiesAndStorage(ctx, page);
-        cookiesCleared = true;
+        document.cookies_cleared = true;
       } catch {}
     }
     await page.close();
-    void cookiesCleared;
   }
+  if (!document) throw new Error("toFigma: extraction failed before document assembly");
+  const rendered = JSON.stringify(document, null, 2);
+  return { document, rendered };
 }

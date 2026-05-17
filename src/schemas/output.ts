@@ -10,7 +10,10 @@ export type CookieConsentMode = z.infer<typeof CookieConsentMode>;
 
 export const AnalyzePageInput = z.object({
   url: z.string().url(),
-  outputs: z.array(OutputKind).min(1).default(["a11y", "tokens", "screenshot"]),
+  outputs: z
+    .array(OutputKind)
+    .nonempty({ message: "outputs must contain at least one of: a11y, tokens, screenshot" })
+    .default(["a11y", "tokens", "screenshot"]),
   viewport: z
     .object({ width: z.number().int().positive(), height: z.number().int().positive() })
     .default({ width: 1440, height: 900 }),

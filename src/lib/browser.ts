@@ -17,10 +17,14 @@ function resolveMode(): BrowserMode {
   return "chromium";
 }
 
-let sharedContext: BrowserContext | null = null;
-let sharedBrowser: Browser | null = null;
-let sharedViewport: Viewport | null = null;
-let sharedMode: BrowserMode | null = null;
+interface SharedState {
+  context: BrowserContext;
+  browser: Browser | null;
+  viewport: Viewport;
+  mode: BrowserMode;
+}
+
+let shared: SharedState | null = null;
 
 async function launchPersistent(viewport: Viewport, channel?: "chrome"): Promise<BrowserContext> {
   return chromium.launchPersistentContext(USER_DATA_DIR, {
@@ -30,58 +34,70 @@ async function launchPersistent(viewport: Viewport, channel?: "chrome"): Promise
   });
 }
 
-async function connectCdp(): Promise<{ browser: Browser; context: BrowserContext }> {
+async function connectCdp(viewport: Viewport): Promise<{ browser: Browser; context: BrowserContext }> {
   const endpoint = process.env.CBM_CDP_URL ?? "http://localhost:9222";
   const browser = await chromium.connectOverCDP(endpoint);
   const contexts = browser.contexts();
   if (contexts.length === 0) {
+    try {
+      await browser.close();
+    } catch (e) {
+      console.error(`CDP browser.close() after empty contexts failed: ${(e as Error).message}`);
+    }
     throw new Error(
       `CDP endpoint ${endpoint} returned 0 contexts. Open at least one tab in target Chrome.`
     );
   }
-  return { browser, context: contexts[0]! };
+  const context = contexts[0]!;
+  const existingPages = context.pages();
+  for (const p of existingPages) {
+    try {
+      await p.setViewportSize(viewport);
+    } catch (e) {
+      console.error(`CDP page.setViewportSize failed: ${(e as Error).message}`);
+    }
+  }
+  return { browser, context };
+}
+
+function viewportEqual(a: Viewport, b: Viewport): boolean {
+  return a.width === b.width && a.height === b.height;
 }
 
 export async function getSharedContext(viewport: Viewport): Promise<BrowserContext> {
   const mode = resolveMode();
 
-  if (sharedContext) {
-    const viewportChanged =
-      sharedViewport &&
-      (sharedViewport.width !== viewport.width || sharedViewport.height !== viewport.height);
-    const modeChanged = sharedMode !== mode;
-    if (viewportChanged || modeChanged) {
+  if (shared) {
+    if (shared.mode !== mode || !viewportEqual(shared.viewport, viewport)) {
       await closeSharedContext();
     } else {
-      return sharedContext;
+      return shared.context;
     }
   }
 
   if (mode === "cdp") {
-    const { browser, context } = await connectCdp();
-    sharedBrowser = browser;
-    sharedContext = context;
+    const { browser, context } = await connectCdp(viewport);
+    shared = { context, browser, viewport, mode };
   } else if (mode === "chrome") {
-    sharedContext = await launchPersistent(viewport, "chrome");
+    const context = await launchPersistent(viewport, "chrome");
+    shared = { context, browser: null, viewport, mode };
   } else {
-    sharedContext = await launchPersistent(viewport);
+    const context = await launchPersistent(viewport);
+    shared = { context, browser: null, viewport, mode };
   }
-  sharedViewport = viewport;
-  sharedMode = mode;
-  return sharedContext;
+  return shared.context;
 }
 
 export async function closeSharedContext(): Promise<void> {
-  if (sharedMode === "cdp") {
-    if (sharedBrowser) {
-      await sharedBrowser.close();
-      sharedBrowser = null;
+  if (!shared) return;
+  try {
+    if (shared.mode === "cdp" && shared.browser) {
+      await shared.browser.close();
+    } else {
+      await shared.context.close();
     }
-    sharedContext = null;
-  } else if (sharedContext) {
-    await sharedContext.close();
-    sharedContext = null;
+  } catch (e) {
+    console.error(`closeSharedContext (${shared.mode}) failed: ${(e as Error).message}`);
   }
-  sharedViewport = null;
-  sharedMode = null;
+  shared = null;
 }

@@ -20,8 +20,13 @@ export type ToClaudeInput = z.infer<typeof ToClaudeInput>;
 
 export const closeShared = closeSharedContext;
 
+export type ClaudeBundleWithCookies = ClaudeBundle & {
+  cookie_consent?: CookieConsentLog;
+  cookies_cleared?: boolean;
+};
+
 export interface ToClaudeResult {
-  bundle: ClaudeBundle & { cookie_consent?: CookieConsentLog; cookies_cleared?: boolean };
+  bundle: ClaudeBundleWithCookies;
   rendered: string;
   format: "yaml" | "json";
 }
@@ -43,18 +48,16 @@ export async function toClaude(rawInput: unknown): Promise<ToClaudeResult> {
   const started = Date.now();
   const ctx = await getSharedContext(input.viewport);
   const page = await ctx.newPage();
-  let cookieLog: CookieConsentLog | undefined;
-  let cookiesCleared = false;
+  let bundle: ClaudeBundleWithCookies | null = null;
   try {
     await page.goto(input.url, { waitUntil: input.wait_until, timeout: input.timeout_ms });
-    if (input.cookie_consent === "auto") {
-      cookieLog = await acceptCookieConsent(page);
-    }
+    const cookieLog =
+      input.cookie_consent === "auto" ? await acceptCookieConsent(page) : undefined;
     const partial = await extractClaudeBundle(page, input.viewport);
     const duration_ms = Date.now() - started;
     const nodeCount = countNodes(partial.tree);
     const approxText = JSON.stringify(partial.tree);
-    const bundle = {
+    bundle = {
       ...partial,
       url: input.url,
       captured_at: new Date(started).toISOString(),
@@ -64,17 +67,18 @@ export async function toClaude(rawInput: unknown): Promise<ToClaudeResult> {
         duration_ms,
       },
       ...(cookieLog ? { cookie_consent: cookieLog } : {}),
+      cookies_cleared: false,
     };
-    const rendered = input.format === "yaml" ? yamlStringify(bundle) : JSON.stringify(bundle, null, 2);
-    return { bundle: { ...bundle, cookies_cleared: false }, rendered, format: input.format };
   } finally {
-    if (input.clear_cookies_after && process.env.CBM_BROWSER_MODE !== "cdp") {
+    if (bundle && input.clear_cookies_after && process.env.CBM_BROWSER_MODE !== "cdp") {
       try {
         await clearCookiesAndStorage(ctx, page);
-        cookiesCleared = true;
+        bundle.cookies_cleared = true;
       } catch {}
     }
     await page.close();
-    void cookiesCleared;
   }
+  if (!bundle) throw new Error("toClaude: extraction failed before bundle assembly");
+  const rendered = input.format === "yaml" ? yamlStringify(bundle) : JSON.stringify(bundle, null, 2);
+  return { bundle, rendered, format: input.format };
 }

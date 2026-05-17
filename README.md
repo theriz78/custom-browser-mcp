@@ -193,6 +193,8 @@ Phase 1 + 2 are 100% local Chromium. Optional LLM augmentation (vision tagging, 
 
 ## Status
 
-Phase 1 (analyze_page) + Phase 1b (to_claude) + Phase 2 v0 (to_figma) shipped. Roadmap & deferred coverage in [`research/PHASE-2-FIGMA-ADAPTER`](https://github.com/) (private spec).
+**v0.4.2** — Phase 1 (analyze_page) + Phase 1b (to_claude) + Phase 2 v0 (to_figma) + cookie consent lifecycle shipped.
+
+Deferred coverage (Phase 3+): SVG path traversal, gradient parser (`GRADIENT_LINEAR`), box-shadow effects (`DROP_SHADOW`), auto-layout heuristic detection (flex/grid), COMPONENT/INSTANCE detection, multi-tab, vision-LLM augmentation.
 
 Issues / PRs welcome.

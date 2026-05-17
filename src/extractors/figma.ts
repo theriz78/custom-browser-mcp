@@ -80,6 +80,7 @@ export interface FigmaDocument {
     ];
   };
   warnings: { kind: string; count: number; hint: string }[];
+  text_dump: string[];
   metrics: { nodes: number; approx_tokens: number; duration_ms: number };
 }
 
@@ -247,6 +248,7 @@ export function bundleToFigma(bundle: ClaudeBundle): FigmaDocument {
       ],
     },
     warnings,
+    text_dump: bundle.text_dump ?? [],
     metrics: {
       nodes: 0,
       approx_tokens: 0,

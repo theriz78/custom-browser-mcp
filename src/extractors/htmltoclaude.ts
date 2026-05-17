@@ -38,8 +38,10 @@ export interface ClaudeBundle {
     type: number[];
   };
   tree: ClaudeNode[];
+  text_dump: string[];
   warnings: ClaudeWarning[];
   metrics: { nodes: number; approx_tokens: number; duration_ms: number };
+  extract_duration_ms?: number;
 }
 
 export async function extractClaudeBundle(
@@ -264,12 +266,37 @@ export async function extractClaudeBundle(
     }
 
     const root = walk(document.body);
-    return { root, counters, visitedCount };
+
+    const spacingValues = new Set<number>();
+    const allEls = Array.from(document.querySelectorAll("body *"));
+    const cap = Math.min(allEls.length, 1500);
+    for (let i = 0; i < cap; i++) {
+      const el = allEls[i] as HTMLElement;
+      const cs = getComputedStyle(el);
+      const props = [
+        cs.paddingTop,
+        cs.paddingRight,
+        cs.paddingBottom,
+        cs.paddingLeft,
+        cs.marginTop,
+        cs.marginRight,
+        cs.marginBottom,
+        cs.marginLeft,
+        cs.gap,
+        cs.rowGap,
+        cs.columnGap,
+      ];
+      for (const p of props) {
+        const v = parseFloat(p);
+        if (Number.isFinite(v) && v > 0 && v <= 200) spacingValues.add(Math.round(v));
+      }
+    }
+    return { root, counters, visitedCount, spacingValues: [...spacingValues] };
   });
 
   const colors: Record<string, string> = {};
   const fonts: Record<string, { family: string; weights: string[] }> = {};
-  const spacingSet = new Set<number>();
+  const spacingSet = new Set<number>(raw.spacingValues);
   const typeSet = new Set<number>();
 
   const colorCounts = new Map<string, number>();
@@ -392,13 +419,23 @@ export async function extractClaudeBundle(
     });
   }
 
+  function collectText(nodes: ClaudeNode[], out: string[]): void {
+    for (const n of nodes) {
+      if (n.chars) out.push(n.chars);
+      if (n.children?.length) collectText(n.children, out);
+    }
+  }
+  const text_dump: string[] = [];
+  collectText(tree, text_dump);
+
   const partial: Omit<ClaudeBundle, "captured_at" | "metrics" | "url"> = {
     schema: "cbm/htmltoclaude/v0",
     viewport: { w: viewport.width, h: viewport.height },
     tokens: { colors, fonts, spacing: [...spacingSet].sort((a, b) => a - b), type: [...typeSet].sort((a, b) => a - b) },
     tree,
+    text_dump,
     warnings,
+    extract_duration_ms: Date.now() - started,
   };
-  void started;
   return partial;
 }
