@@ -4,6 +4,7 @@ import { extractClaudeBundle, type ClaudeBundle, type ClaudeNode } from "../extr
 import { getSharedContext, closeSharedContext } from "../lib/browser.js";
 import { acceptCookieConsent, clearCookiesAndStorage } from "../lib/cookies.js";
 import { CookieConsentMode, type CookieConsentLog } from "../schemas/output.js";
+import { assertSafeUrl } from "../lib/urlGuard.js";
 
 export const ToClaudeInput = z.object({
   url: z.string().url(),
@@ -15,6 +16,7 @@ export const ToClaudeInput = z.object({
   format: z.enum(["yaml", "json"]).default("yaml"),
   cookie_consent: CookieConsentMode.default("auto"),
   clear_cookies_after: z.boolean().default(true),
+  allow_private_urls: z.boolean().default(false),
 });
 export type ToClaudeInput = z.infer<typeof ToClaudeInput>;
 
@@ -45,6 +47,7 @@ function countNodes(tree: ClaudeNode[]): number {
 
 export async function toClaude(rawInput: unknown): Promise<ToClaudeResult> {
   const input = ToClaudeInput.parse(rawInput);
+  assertSafeUrl(input.url, { allowPrivate: input.allow_private_urls });
   const started = Date.now();
   const ctx = await getSharedContext(input.viewport);
   const page = await ctx.newPage();

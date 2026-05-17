@@ -8,9 +8,10 @@ import { analyzePage } from "./tools/analyze_page.js";
 import { toClaude } from "./tools/to_claude.js";
 import { toFigma } from "./tools/to_figma.js";
 import { closeSharedContext } from "./lib/browser.js";
+import { wrapUntrusted } from "./lib/untrusted.js";
 
 const SERVER_NAME = "eclectique-browser-mcp";
-const SERVER_VERSION = "0.4.2";
+const SERVER_VERSION = "0.4.3";
 
 const ANALYZE_PAGE_TOOL = {
   name: "analyze_page",
@@ -97,15 +98,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   if (req.params.name === "analyze_page") {
     const bundle = await analyzePage(req.params.arguments);
-    return { content: [{ type: "text", text: JSON.stringify(bundle, null, 2) }] };
+    return {
+      content: [{ type: "text", text: wrapUntrusted(bundle.url, JSON.stringify(bundle, null, 2)) }],
+    };
   }
   if (req.params.name === "to_claude") {
     const result = await toClaude(req.params.arguments);
-    return { content: [{ type: "text", text: result.rendered }] };
+    return {
+      content: [{ type: "text", text: wrapUntrusted(result.bundle.url, result.rendered) }],
+    };
   }
   if (req.params.name === "to_figma") {
     const result = await toFigma(req.params.arguments);
-    return { content: [{ type: "text", text: result.rendered }] };
+    return {
+      content: [{ type: "text", text: wrapUntrusted(result.document.source_url, result.rendered) }],
+    };
   }
   throw new Error(`Unknown tool: ${req.params.name}`);
 });

@@ -6,6 +6,7 @@ import { extractTokens } from "../extractors/tokens.js";
 import { captureScreenshot } from "../extractors/screenshot.js";
 import { getSharedContext, closeSharedContext } from "../lib/browser.js";
 import { acceptCookieConsent, clearCookiesAndStorage } from "../lib/cookies.js";
+import { assertSafeUrl } from "../lib/urlGuard.js";
 
 const OUT_DIR = resolve(import.meta.dir, "..", "..", "out");
 
@@ -18,6 +19,7 @@ function snapshotId(url: string, ts: number): string {
 
 export async function analyzePage(rawInput: unknown): Promise<Bundle> {
   const input = AnalyzePageInput.parse(rawInput);
+  assertSafeUrl(input.url, { allowPrivate: input.allow_private_urls });
   const started = Date.now();
   const fetched_at = new Date(started).toISOString();
   const sid = snapshotId(input.url, started);

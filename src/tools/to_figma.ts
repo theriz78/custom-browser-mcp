@@ -4,6 +4,7 @@ import { bundleToFigma, type FigmaDocument } from "../extractors/figma.js";
 import { getSharedContext, closeSharedContext } from "../lib/browser.js";
 import { acceptCookieConsent, clearCookiesAndStorage } from "../lib/cookies.js";
 import { CookieConsentMode, type CookieConsentLog } from "../schemas/output.js";
+import { assertSafeUrl } from "../lib/urlGuard.js";
 
 export const ToFigmaInput = z.object({
   url: z.string().url(),
@@ -14,6 +15,7 @@ export const ToFigmaInput = z.object({
   timeout_ms: z.number().int().positive().default(30000),
   cookie_consent: CookieConsentMode.default("auto"),
   clear_cookies_after: z.boolean().default(true),
+  allow_private_urls: z.boolean().default(false),
 });
 export type ToFigmaInput = z.infer<typeof ToFigmaInput>;
 
@@ -43,6 +45,7 @@ function countNodes(tree: ClaudeNode[]): number {
 
 export async function toFigma(rawInput: unknown): Promise<ToFigmaResult> {
   const input = ToFigmaInput.parse(rawInput);
+  assertSafeUrl(input.url, { allowPrivate: input.allow_private_urls });
   const started = Date.now();
   const ctx = await getSharedContext(input.viewport);
   const page = await ctx.newPage();

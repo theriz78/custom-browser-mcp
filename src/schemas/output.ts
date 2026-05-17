@@ -22,6 +22,7 @@ export const AnalyzePageInput = z.object({
   timeout_ms: z.number().int().positive().default(30000),
   cookie_consent: CookieConsentMode.default("auto"),
   clear_cookies_after: z.boolean().default(true),
+  allow_private_urls: z.boolean().default(false),
 });
 export type AnalyzePageInput = z.infer<typeof AnalyzePageInput>;
 
