@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const BUNDLE_SCHEMA_VERSION = "1.1.0";
+export const BUNDLE_SCHEMA_VERSION = "1.2.0";
 
 export const OutputKind = z.enum(["a11y", "tokens", "screenshot"]);
 export type OutputKind = z.infer<typeof OutputKind>;
@@ -57,7 +57,15 @@ export const TokensPayload = z.object({
     z.object({ value: z.string(), count: z.number().int().nonnegative(), confidence: z.enum(["high", "medium", "low"]) })
   ),
   fonts: z.array(
-    z.object({ family: z.string(), weights: z.array(z.string()), sample_count: z.number().int().nonnegative() })
+    z.object({
+      family: z.string(),
+      weights: z.array(z.string()),
+      styles: z.array(z.string()).default([]),
+      stack: z.array(z.string()).default([]),
+      sample_count: z.number().int().nonnegative(),
+      source: z.enum(["system", "webfont", "unknown"]).default("unknown"),
+      face_urls: z.array(z.string()).optional(),
+    })
   ),
   spacing_scale: z.array(z.number()),
   type_scale_px: z.array(z.number()),

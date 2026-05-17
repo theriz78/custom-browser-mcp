@@ -7,11 +7,12 @@ import {
 import { analyzePage } from "./tools/analyze_page.js";
 import { toClaude } from "./tools/to_claude.js";
 import { toFigma } from "./tools/to_figma.js";
+import { seedAuthSession } from "./tools/seed_auth.js";
 import { closeSharedContext } from "./lib/browser.js";
 import { wrapUntrusted } from "./lib/untrusted.js";
 
 const SERVER_NAME = "eclectique-browser-mcp";
-const SERVER_VERSION = "0.7.0";
+const SERVER_VERSION = "0.8.0";
 
 const SOURCE_SCHEMA_PROPS = {
   url: { type: "string", description: "Public http(s):// URL to load. XOR with `html` / `html_path`." },
@@ -141,8 +142,39 @@ const server = new Server(
   { capabilities: { tools: {} } }
 );
 
+const SEED_AUTH_TOOL = {
+  name: "seed_auth_session",
+  description:
+    "v0.8.0: opens a headed Chromium tab on `url`, lets the operator log in manually, and persists cookies + localStorage to the user-data-dir profile. Subsequent analyze_page / to_claude / to_figma calls reuse that auth IF caller passes `clear_cookies_after: false`. Closes when the user closes the window OR after `idle_timeout_ms` (default 5min, max 30min). Closes the shared headless context first (single-process lock on profile dir).",
+  inputSchema: {
+    type: "object",
+    properties: {
+      url: { type: "string", description: "Login or session-bootstrap URL to open in the headed browser." },
+      viewport: {
+        type: "object",
+        properties: {
+          width: { type: "integer", default: 1440 },
+          height: { type: "integer", default: 900 },
+        },
+      },
+      channel: {
+        enum: ["chromium", "chrome"],
+        default: "chromium",
+        description: "Use `chrome` for Google Chrome (better anti-bot signal). Requires Chrome installed.",
+      },
+      idle_timeout_ms: {
+        type: "integer",
+        default: 300000,
+        description: "Auto-close timeout in ms if user does not close window (max 1800000 = 30min).",
+      },
+      allow_private_urls: { type: "boolean", default: false },
+    },
+    required: ["url"],
+  },
+} as const;
+
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [ANALYZE_PAGE_TOOL, TO_CLAUDE_TOOL, TO_FIGMA_TOOL],
+  tools: [ANALYZE_PAGE_TOOL, TO_CLAUDE_TOOL, TO_FIGMA_TOOL, SEED_AUTH_TOOL],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
@@ -162,6 +194,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const result = await toFigma(req.params.arguments);
     return {
       content: [{ type: "text", text: wrapUntrusted(result.document.source_url, result.rendered) }],
+    };
+  }
+  if (req.params.name === "seed_auth_session") {
+    const result = await seedAuthSession(req.params.arguments);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
   }
   throw new Error(`Unknown tool: ${req.params.name}`);

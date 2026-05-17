@@ -2,6 +2,8 @@
 
 > Eclectique Browser MCP — turns any live URL **or pasted HTML / local file / zip** into a multi-output design bundle: a11y tree, design tokens, screenshot, Claude-consumable DSL, Figma REST JSON. Zero LLM API cost. Persistent Chromium context.
 
+**v0.8.0** (S61): `seed_auth_session` headed-login tool (feature-to-steal #4 persistent UDD auth — bypass login-gated portals). Font extractor CSS-first upgrade (feature-to-steal #5): captures full `font-family` stack, `font-style` (italic), `@font-face` URLs, `source: system|webfont|unknown` classification, and Google-Fonts/Typekit link detection. `Bundle` schema → `v1.2.0` (TokensPayload extended).
+
 **v0.7.0** (S61): paste-HTML inputs (`html` inline string · `html_path` for `.html|.htm|.zip|.mhtml`) — XOR with `url`. Closes html.to.design top gap #1: localhost / auth-gated / staging / email content bypass. Zip unpack to temp dir auto-cleanup. `Bundle` schema bumped to `v1.1.0` (url now plain string).
 
 **v0.6.0** (S60): SVG outerHTML preserved · CSS gradients → `GRADIENT_LINEAR`/`GRADIENT_RADIAL` paints · `::before`/`::after` pseudo-elements captured · `max_nodes` override · native JS click pattern documented for interactive-state forcing.
