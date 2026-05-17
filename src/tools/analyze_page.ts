@@ -48,6 +48,17 @@ export async function analyzePage(rawInput: unknown): Promise<Bundle> {
       }
     }
 
+    if (input.pre_render_script) {
+      try {
+        await page.evaluate(input.pre_render_script);
+        if (input.pre_render_delay_ms > 0) {
+          await page.waitForTimeout(input.pre_render_delay_ms);
+        }
+      } catch (e) {
+        warnings.push(`pre_render_script_failed: ${(e as Error).message}`);
+      }
+    }
+
     if (input.outputs.includes("a11y")) {
       try {
         bundle.a11y = await extractA11y(page);

@@ -11,12 +11,12 @@ import { closeSharedContext } from "./lib/browser.js";
 import { wrapUntrusted } from "./lib/untrusted.js";
 
 const SERVER_NAME = "eclectique-browser-mcp";
-const SERVER_VERSION = "0.4.3";
+const SERVER_VERSION = "0.5.0";
 
 const ANALYZE_PAGE_TOOL = {
   name: "analyze_page",
   description:
-    "Multi-output bundle MVP: load a URL with Playwright (persistent Chromium context) and return any subset of {a11y tree, basic design tokens, full-page screenshot}.",
+    "Multi-output bundle MVP: load a URL with Playwright (persistent Chromium context) and return any subset of {a11y tree, basic design tokens, full-page screenshot}. Supports pre_render_script for JS injection (force-expand dropdowns, dismiss banners, scroll-trigger lazy content) before capture.",
   inputSchema: {
     type: "object",
     properties: {
@@ -36,6 +36,15 @@ const ANALYZE_PAGE_TOOL = {
       full_page_screenshot: { type: "boolean", default: true },
       wait_until: { enum: ["load", "domcontentloaded", "networkidle"], default: "networkidle" },
       timeout_ms: { type: "integer", default: 30000 },
+      pre_render_script: {
+        type: "string",
+        description: "JavaScript snippet evaluated via page.evaluate() AFTER navigation+cookie consent but BEFORE extraction. Use to force interactive states (expand docks, open menus, dismiss popups, scroll). Function form `() => { /* ... */ }` or plain statements. Errors logged as warnings.",
+      },
+      pre_render_delay_ms: {
+        type: "integer",
+        default: 0,
+        description: "Optional wait in ms AFTER pre_render_script runs (e.g. to let CSS transitions complete).",
+      },
     },
     required: ["url"],
   },
@@ -44,7 +53,7 @@ const ANALYZE_PAGE_TOOL = {
 const TO_CLAUDE_TOOL = {
   name: "to_claude",
   description:
-    "htmltoclaude v0: convert a live webpage to a compact YAML DSL (cbm/htmltoclaude/v0) Claude-consumable representation. Hoists colors+fonts to tokens, captures box/role/style per node, walks shadowRoot, surfaces iframe/gradient/CSS-filter gaps as warnings.",
+    "htmltoclaude v0: convert a live webpage to a compact YAML DSL (cbm/htmltoclaude/v0) Claude-consumable representation. Hoists colors+fonts to tokens, captures box/role/style per node, walks shadowRoot, surfaces iframe/gradient/CSS-filter gaps as warnings. Supports pre_render_script for JS injection before extraction.",
   inputSchema: {
     type: "object",
     properties: {
@@ -59,6 +68,15 @@ const TO_CLAUDE_TOOL = {
       wait_until: { enum: ["load", "domcontentloaded", "networkidle"], default: "networkidle" },
       timeout_ms: { type: "integer", default: 30000 },
       format: { enum: ["yaml", "json"], default: "yaml" },
+      pre_render_script: {
+        type: "string",
+        description: "JavaScript snippet evaluated via page.evaluate() AFTER navigation+cookie consent but BEFORE extraction. Use to force interactive states (expand docks, open menus, dismiss popups, scroll).",
+      },
+      pre_render_delay_ms: {
+        type: "integer",
+        default: 0,
+        description: "Optional wait in ms AFTER pre_render_script runs.",
+      },
     },
     required: ["url"],
   },
@@ -67,7 +85,7 @@ const TO_CLAUDE_TOOL = {
 const TO_FIGMA_TOOL = {
   name: "to_figma",
   description:
-    "Phase 2 v0 DOM→Figma JSON adapter (cbm/htmltofigma/v0). Reuses htmltoclaude walker then maps to Figma REST node format (FRAME/TEXT/RECTANGLE/VECTOR/GROUP). Solid fills + corner radius + borders + clip + text style emitted. SVG paths/gradients/iframes deferred (warnings).",
+    "Phase 2 v0 DOM→Figma JSON adapter (cbm/htmltofigma/v0). Reuses htmltoclaude walker then maps to Figma REST node format (FRAME/TEXT/RECTANGLE/VECTOR/GROUP). Solid fills + corner radius + borders + clip + text style emitted. SVG paths/gradients/iframes deferred (warnings). Supports pre_render_script for JS injection (interactive state forcing) before capture.",
   inputSchema: {
     type: "object",
     properties: {
@@ -81,6 +99,15 @@ const TO_FIGMA_TOOL = {
       },
       wait_until: { enum: ["load", "domcontentloaded", "networkidle"], default: "networkidle" },
       timeout_ms: { type: "integer", default: 30000 },
+      pre_render_script: {
+        type: "string",
+        description: "JavaScript snippet evaluated via page.evaluate() AFTER navigation+cookie consent but BEFORE extraction. Use to force interactive states (expand docks, open menus, dismiss popups, scroll).",
+      },
+      pre_render_delay_ms: {
+        type: "integer",
+        default: 0,
+        description: "Optional wait in ms AFTER pre_render_script runs.",
+      },
     },
     required: ["url"],
   },

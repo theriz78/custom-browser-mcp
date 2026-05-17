@@ -17,6 +17,8 @@ export const ToClaudeInput = z.object({
   cookie_consent: CookieConsentMode.default("auto"),
   clear_cookies_after: z.boolean().default(true),
   allow_private_urls: z.boolean().default(false),
+  pre_render_script: z.string().optional(),
+  pre_render_delay_ms: z.number().int().nonnegative().default(0),
 });
 export type ToClaudeInput = z.infer<typeof ToClaudeInput>;
 
@@ -56,6 +58,12 @@ export async function toClaude(rawInput: unknown): Promise<ToClaudeResult> {
     await page.goto(input.url, { waitUntil: input.wait_until, timeout: input.timeout_ms });
     const cookieLog =
       input.cookie_consent === "auto" ? await acceptCookieConsent(page) : undefined;
+    if (input.pre_render_script) {
+      await page.evaluate(input.pre_render_script);
+      if (input.pre_render_delay_ms > 0) {
+        await page.waitForTimeout(input.pre_render_delay_ms);
+      }
+    }
     const partial = await extractClaudeBundle(page, input.viewport);
     const duration_ms = Date.now() - started;
     const nodeCount = countNodes(partial.tree);

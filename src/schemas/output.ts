@@ -23,6 +23,8 @@ export const AnalyzePageInput = z.object({
   cookie_consent: CookieConsentMode.default("auto"),
   clear_cookies_after: z.boolean().default(true),
   allow_private_urls: z.boolean().default(false),
+  pre_render_script: z.string().optional(),
+  pre_render_delay_ms: z.number().int().nonnegative().default(0),
 });
 export type AnalyzePageInput = z.infer<typeof AnalyzePageInput>;
 
