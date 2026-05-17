@@ -20,6 +20,8 @@ try {
     screenshot_path: bundle.screenshot?.path,
     screenshot_bytes: bundle.screenshot?.bytes,
     warnings: bundle.warnings,
+    cookie_consent: bundle.cookie_consent,
+    cookies_cleared: bundle.cookies_cleared,
   };
   console.log(JSON.stringify(summary, null, 2));
 } finally {

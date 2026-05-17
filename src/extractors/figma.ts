@@ -254,7 +254,6 @@ export function bundleToFigma(bundle: ClaudeBundle): FigmaDocument {
     },
   };
 
-  const json = JSON.stringify(doc);
   let count = 0;
   function tally(n: FigmaNode): void {
     count++;
@@ -263,7 +262,7 @@ export function bundleToFigma(bundle: ClaudeBundle): FigmaDocument {
   for (const c of children) tally(c);
   doc.metrics = {
     nodes: count,
-    approx_tokens: Math.ceil(json.length / 4),
+    approx_tokens: Math.ceil(JSON.stringify(doc).length / 4),
     duration_ms: Date.now() - started,
   };
   return doc;

@@ -100,11 +100,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     return { content: [{ type: "text", text: JSON.stringify(bundle, null, 2) }] };
   }
   if (req.params.name === "to_claude") {
-    const result = await toClaude(req.params.arguments as any);
+    const result = await toClaude(req.params.arguments);
     return { content: [{ type: "text", text: result.rendered }] };
   }
   if (req.params.name === "to_figma") {
-    const result = await toFigma(req.params.arguments as any);
+    const result = await toFigma(req.params.arguments);
     return { content: [{ type: "text", text: result.rendered }] };
   }
   throw new Error(`Unknown tool: ${req.params.name}`);

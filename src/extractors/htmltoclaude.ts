@@ -305,9 +305,12 @@ export async function extractClaudeBundle(
     fontRef.set(family, ref);
   });
 
+  const filteredTypeSet = new Set<number>();
   for (const v of typeSet) {
-    if (v >= 8 && v <= 128) typeSet.add(v);
+    if (v >= 8 && v <= 128) filteredTypeSet.add(v);
   }
+  typeSet.clear();
+  for (const v of filteredTypeSet) typeSet.add(v);
 
   function ref(n: any): ClaudeNode | null {
     if (!n) return null;

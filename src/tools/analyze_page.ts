@@ -5,6 +5,7 @@ import { extractA11y } from "../extractors/a11y.js";
 import { extractTokens } from "../extractors/tokens.js";
 import { captureScreenshot } from "../extractors/screenshot.js";
 import { getSharedContext, closeSharedContext } from "../lib/browser.js";
+import { acceptCookieConsent, clearCookiesAndStorage } from "../lib/cookies.js";
 
 const OUT_DIR = resolve(import.meta.dir, "..", "..", "out");
 
@@ -37,6 +38,14 @@ export async function analyzePage(rawInput: unknown): Promise<Bundle> {
   try {
     await page.goto(input.url, { waitUntil: input.wait_until, timeout: input.timeout_ms });
 
+    if (input.cookie_consent === "auto") {
+      try {
+        bundle.cookie_consent = await acceptCookieConsent(page);
+      } catch (e) {
+        warnings.push(`cookie_consent_failed: ${(e as Error).message}`);
+      }
+    }
+
     if (input.outputs.includes("a11y")) {
       try {
         bundle.a11y = await extractA11y(page);
@@ -61,6 +70,14 @@ export async function analyzePage(rawInput: unknown): Promise<Bundle> {
       }
     }
   } finally {
+    if (input.clear_cookies_after && process.env.CBM_BROWSER_MODE !== "cdp") {
+      try {
+        await clearCookiesAndStorage(ctx, page);
+        bundle.cookies_cleared = true;
+      } catch (e) {
+        warnings.push(`clear_cookies_failed: ${(e as Error).message}`);
+      }
+    }
     await page.close();
   }
 

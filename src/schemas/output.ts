@@ -5,6 +5,9 @@ export const BUNDLE_SCHEMA_VERSION = "1.0.0";
 export const OutputKind = z.enum(["a11y", "tokens", "screenshot"]);
 export type OutputKind = z.infer<typeof OutputKind>;
 
+export const CookieConsentMode = z.enum(["auto", "skip"]);
+export type CookieConsentMode = z.infer<typeof CookieConsentMode>;
+
 export const AnalyzePageInput = z.object({
   url: z.string().url(),
   outputs: z.array(OutputKind).min(1).default(["a11y", "tokens", "screenshot"]),
@@ -14,8 +17,18 @@ export const AnalyzePageInput = z.object({
   full_page_screenshot: z.boolean().default(true),
   wait_until: z.enum(["load", "domcontentloaded", "networkidle"]).default("networkidle"),
   timeout_ms: z.number().int().positive().default(30000),
+  cookie_consent: CookieConsentMode.default("auto"),
+  clear_cookies_after: z.boolean().default(true),
 });
 export type AnalyzePageInput = z.infer<typeof AnalyzePageInput>;
+
+export const CookieConsentLog = z.object({
+  attempted: z.boolean(),
+  accepted: z.boolean(),
+  selector_matched: z.string().optional(),
+  duration_ms: z.number().int().nonnegative(),
+});
+export type CookieConsentLog = z.infer<typeof CookieConsentLog>;
 
 export const A11yPayload = z.object({
   yaml: z.string(),
@@ -52,5 +65,7 @@ export const Bundle = z.object({
   screenshot: ScreenshotPayload.optional(),
   warnings: z.array(z.string()).default([]),
   snapshot_id: z.string(),
+  cookie_consent: CookieConsentLog.optional(),
+  cookies_cleared: z.boolean().optional(),
 });
 export type Bundle = z.infer<typeof Bundle>;
