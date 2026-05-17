@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const BUNDLE_SCHEMA_VERSION = "1.0.0";
+export const BUNDLE_SCHEMA_VERSION = "1.1.0";
 
 export const OutputKind = z.enum(["a11y", "tokens", "screenshot"]);
 export type OutputKind = z.infer<typeof OutputKind>;
@@ -8,24 +8,34 @@ export type OutputKind = z.infer<typeof OutputKind>;
 export const CookieConsentMode = z.enum(["auto", "skip"]);
 export type CookieConsentMode = z.infer<typeof CookieConsentMode>;
 
-export const AnalyzePageInput = z.object({
-  url: z.string().url(),
-  outputs: z
-    .array(OutputKind)
-    .nonempty({ message: "outputs must contain at least one of: a11y, tokens, screenshot" })
-    .default(["a11y", "tokens", "screenshot"]),
-  viewport: z
-    .object({ width: z.number().int().positive(), height: z.number().int().positive() })
-    .default({ width: 1440, height: 900 }),
-  full_page_screenshot: z.boolean().default(true),
-  wait_until: z.enum(["load", "domcontentloaded", "networkidle"]).default("networkidle"),
-  timeout_ms: z.number().int().positive().default(30000),
-  cookie_consent: CookieConsentMode.default("auto"),
-  clear_cookies_after: z.boolean().default(true),
-  allow_private_urls: z.boolean().default(false),
-  pre_render_script: z.string().optional(),
-  pre_render_delay_ms: z.number().int().nonnegative().default(0),
-});
+const PASTE_HTML_MAX_BYTES = 8 * 1024 * 1024;
+
+export const AnalyzePageInput = z
+  .object({
+    url: z.string().min(1).optional(),
+    html: z.string().min(1).max(PASTE_HTML_MAX_BYTES).optional(),
+    html_path: z.string().min(1).optional(),
+    base_url: z.string().url().optional(),
+    outputs: z
+      .array(OutputKind)
+      .nonempty({ message: "outputs must contain at least one of: a11y, tokens, screenshot" })
+      .default(["a11y", "tokens", "screenshot"]),
+    viewport: z
+      .object({ width: z.number().int().positive(), height: z.number().int().positive() })
+      .default({ width: 1440, height: 900 }),
+    full_page_screenshot: z.boolean().default(true),
+    wait_until: z.enum(["load", "domcontentloaded", "networkidle"]).default("networkidle"),
+    timeout_ms: z.number().int().positive().default(30000),
+    cookie_consent: CookieConsentMode.default("auto"),
+    clear_cookies_after: z.boolean().default(true),
+    allow_private_urls: z.boolean().default(false),
+    pre_render_script: z.string().optional(),
+    pre_render_delay_ms: z.number().int().nonnegative().default(0),
+  })
+  .refine(
+    (d) => [d.url, d.html, d.html_path].filter((v) => typeof v === "string" && v.length > 0).length === 1,
+    { message: "provide exactly one of `url` | `html` | `html_path` (mutually exclusive)" }
+  );
 export type AnalyzePageInput = z.infer<typeof AnalyzePageInput>;
 
 export const CookieConsentLog = z.object({
@@ -62,7 +72,7 @@ export const ScreenshotPayload = z.object({
 
 export const Bundle = z.object({
   schema_version: z.literal(BUNDLE_SCHEMA_VERSION),
-  url: z.string().url(),
+  url: z.string().min(1),
   fetched_at: z.string(),
   duration_ms: z.number().int().nonnegative(),
   outputs_requested: z.array(OutputKind),

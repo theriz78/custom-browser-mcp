@@ -6,30 +6,36 @@ import { extractTokens } from "../extractors/tokens.js";
 import { captureScreenshot } from "../extractors/screenshot.js";
 import { getSharedContext, closeSharedContext } from "../lib/browser.js";
 import { acceptCookieConsent, clearCookiesAndStorage } from "../lib/cookies.js";
-import { assertSafeUrl } from "../lib/urlGuard.js";
+import { resolveSource, loadIntoPage, cleanupSource } from "../lib/source.js";
 
 const OUT_DIR = resolve(import.meta.dir, "..", "..", "out");
 
 export const closeShared = closeSharedContext;
 
-function snapshotId(url: string, ts: number): string {
-  const h = createHash("sha256").update(`${url}|${ts}`).digest("hex").slice(0, 16);
+function snapshotId(label: string, ts: number): string {
+  const h = createHash("sha256").update(`${label}|${ts}`).digest("hex").slice(0, 16);
   return `cbm-${ts}-${h}`;
 }
 
 export async function analyzePage(rawInput: unknown): Promise<Bundle> {
   const input = AnalyzePageInput.parse(rawInput);
-  assertSafeUrl(input.url, { allowPrivate: input.allow_private_urls });
+  const source = await resolveSource({
+    url: input.url,
+    html: input.html,
+    html_path: input.html_path,
+    base_url: input.base_url,
+    allow_private_urls: input.allow_private_urls,
+  });
   const started = Date.now();
   const fetched_at = new Date(started).toISOString();
-  const sid = snapshotId(input.url, started);
+  const sid = snapshotId(source.label, started);
   const warnings: string[] = [];
 
   const ctx = await getSharedContext(input.viewport);
   const page = await ctx.newPage();
   const bundle: Bundle = {
     schema_version: BUNDLE_SCHEMA_VERSION,
-    url: input.url,
+    url: source.label,
     fetched_at,
     duration_ms: 0,
     outputs_requested: input.outputs,
@@ -38,9 +44,9 @@ export async function analyzePage(rawInput: unknown): Promise<Bundle> {
   };
 
   try {
-    await page.goto(input.url, { waitUntil: input.wait_until, timeout: input.timeout_ms });
+    await loadIntoPage(page, source, { waitUntil: input.wait_until, timeoutMs: input.timeout_ms });
 
-    if (input.cookie_consent === "auto") {
+    if (source.kind === "url" && input.cookie_consent === "auto") {
       try {
         bundle.cookie_consent = await acceptCookieConsent(page);
       } catch (e) {
@@ -83,7 +89,11 @@ export async function analyzePage(rawInput: unknown): Promise<Bundle> {
       }
     }
   } finally {
-    if (input.clear_cookies_after && process.env.CBM_BROWSER_MODE !== "cdp") {
+    if (
+      source.kind === "url" &&
+      input.clear_cookies_after &&
+      process.env.CBM_BROWSER_MODE !== "cdp"
+    ) {
       try {
         await clearCookiesAndStorage(ctx, page);
         bundle.cookies_cleared = true;
@@ -92,6 +102,7 @@ export async function analyzePage(rawInput: unknown): Promise<Bundle> {
       }
     }
     await page.close();
+    await cleanupSource(source);
   }
 
   bundle.duration_ms = Date.now() - started;

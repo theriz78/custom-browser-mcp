@@ -1,6 +1,8 @@
 # eclectique-browser-mcp
 
-> Eclectique Browser MCP — turns any live URL into a multi-output design bundle: a11y tree, design tokens, screenshot, Claude-consumable DSL, Figma REST JSON. Zero LLM API cost. Persistent Chromium context.
+> Eclectique Browser MCP — turns any live URL **or pasted HTML / local file / zip** into a multi-output design bundle: a11y tree, design tokens, screenshot, Claude-consumable DSL, Figma REST JSON. Zero LLM API cost. Persistent Chromium context.
+
+**v0.7.0** (S61): paste-HTML inputs (`html` inline string · `html_path` for `.html|.htm|.zip|.mhtml`) — XOR with `url`. Closes html.to.design top gap #1: localhost / auth-gated / staging / email content bypass. Zip unpack to temp dir auto-cleanup. `Bundle` schema bumped to `v1.1.0` (url now plain string).
 
 **v0.6.0** (S60): SVG outerHTML preserved · CSS gradients → `GRADIENT_LINEAR`/`GRADIENT_RADIAL` paints · `::before`/`::after` pseudo-elements captured · `max_nodes` override · native JS click pattern documented for interactive-state forcing.
 
@@ -13,23 +15,30 @@
 
 ## Tools (3)
 
+### Source inputs (v0.7.0) — all 3 tools
+
+Provide exactly **one** of:
+- `url` — public `http(s)://` URL (SSRF-guarded against private/loopback ranges unless `allow_private_urls`).
+- `html` — inline raw HTML string (≤8MB). Rendered via `page.setContent()`. Optional `base_url` resolves relative refs.
+- `html_path` — absolute path to `.html` / `.htm` / `.zip` / `.mhtml` (zip ≤32MB; entry resolved as `index.html` → `{zipname}.html` → first `.html`). Loaded via `file://`. Temp dir auto-cleaned.
+
+XOR enforced server-side (zod refine). All extractors/walkers identical across the three modes.
+
 ### `analyze_page`
 
 Multi-output bundle. Pick any subset of {a11y, tokens, screenshot}.
 
 ```jsonc
-// input
-{
-  "url": "https://example.com",
-  "outputs": ["a11y", "tokens", "screenshot"],
-  "viewport": { "width": 1440, "height": 900 },
-  "full_page_screenshot": true,
-  "wait_until": "networkidle",
-  "timeout_ms": 30000
-}
+// input — URL mode
+{ "url": "https://example.com", "outputs": ["a11y", "tokens", "screenshot"] }
+// input — inline HTML
+{ "html": "<!doctype html><html>...</html>", "outputs": ["a11y"] }
+// input — local file or zip
+{ "html_path": "/abs/path/to/page.html" }
+{ "html_path": "/abs/path/to/bundle.zip" }
 ```
 
-Output: `Bundle` v1.0.0 ([schema](src/schemas/output.ts)). Versioned `snapshot_id` (sha256 url+ts).
+Output: `Bundle` v1.1.0 ([schema](src/schemas/output.ts)). Versioned `snapshot_id` (sha256 label+ts). `bundle.url` is now a string label — full `inline:html#sha`, `file://...`, or original URL.
 
 | Field | Type | Notes |
 |---|---|---|
