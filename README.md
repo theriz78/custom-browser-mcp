@@ -2,6 +2,8 @@
 
 > Eclectique Browser MCP — turns any live URL **or pasted HTML / local file / zip** into a multi-output design bundle: a11y tree, design tokens, screenshot, Claude-consumable DSL, Figma REST JSON. Zero LLM API cost. Persistent Chromium context.
 
+**v0.9.0** (S62): Patchright NodeJS drop-in adopted per RFC-EBM-HYBRID-S61 verdict B. All `playwright` imports swapped to `patchright@1.59.4` (Apache-2.0, Vinyzu). API parity preserved (`launchPersistentContext`, `Page`, types). Anti-detect uplift: `Runtime.enable` CDP leak patched, `--disable-blink-features=AutomationControlled`, isolated ExecutionContexts. UDD doctrine + Bun runtime preserved. Smokes 5/5 PASS. Caveat: viewport mid-session switch + `file://` goto via `toClaude` wrapper hangs (workaround: stable viewport per session).
+
 **v0.8.0** (S61): `seed_auth_session` headed-login tool (feature-to-steal #4 persistent UDD auth — bypass login-gated portals). Font extractor CSS-first upgrade (feature-to-steal #5): captures full `font-family` stack, `font-style` (italic), `@font-face` URLs, `source: system|webfont|unknown` classification, and Google-Fonts/Typekit link detection. `Bundle` schema → `v1.2.0` (TokensPayload extended).
 
 **v0.7.0** (S61): paste-HTML inputs (`html` inline string · `html_path` for `.html|.htm|.zip|.mhtml`) — XOR with `url`. Closes html.to.design top gap #1: localhost / auth-gated / staging / email content bypass. Zip unpack to temp dir auto-cleanup. `Bundle` schema bumped to `v1.1.0` (url now plain string).
@@ -10,7 +12,7 @@
 
 [![MCP](https://img.shields.io/badge/MCP-1.29-blue)](https://modelcontextprotocol.io)
 [![Bun](https://img.shields.io/badge/Bun-1.3-fbf0df)](https://bun.sh)
-[![Playwright](https://img.shields.io/badge/Playwright-1.60-2ead33)](https://playwright.dev)
+[![Patchright](https://img.shields.io/badge/Patchright-1.59-2ead33)](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
@@ -96,7 +98,7 @@ Deferred Phase 3+: full SVG path parse to native VECTOR geometry, conic-gradient
 
 ```bash
 bun install
-bunx playwright install chromium-headless-shell
+bunx patchright install chromium
 ```
 
 ## Run
@@ -131,7 +133,7 @@ Restart Claude Code. Verify with `/mcp` — should list `eclectique-browser` wit
 - [Bun](https://bun.sh) 1.3 — runtime + package manager
 - [TypeScript](https://typescriptlang.org) 5
 - [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/sdk) 1.29 — stdio transport
-- [Playwright](https://playwright.dev) 1.60 — Chromium headless persistent context
+- [Patchright](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright) 1.59 — Chromium headless persistent context (anti-detect drop-in, Playwright API parity)
 - [Zod](https://zod.dev) 4 — input/output schema validation
 - [yaml](https://eemeli.org/yaml/) 2.9 — YAML serialization (`to_claude`)
 
