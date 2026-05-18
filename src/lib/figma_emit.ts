@@ -1,44 +1,65 @@
 /**
- * Phase 3 v0.1 — EBM bundle → use_figma plugin JS string emitter.
+ * Phase 3 v0.2 — EBM bundle → use_figma plugin JS string emitter (flat + chunked + image hybrid).
  *
- * Pure-TS function. Does NOT call use_figma itself (client-side responsibility :
- * Claude main thread or external orchestrator runs the produced script via
- * Claude.ai Figma MCP `use_figma({ code, skillNames: "figma-use" })`).
+ * Strategy v0.2 (S66) :
+ * 1. Walk the tree pre-order, emit each node as a flat record with its own `nX` var, parent var,
+ *    create/config lines (no inline appendChild), and image URLs referenced.
+ * 2. Bin-pack the flat sequence into chunks under maxBytesPerChunk (default 40KB, under 50KB cap).
+ * 3. For each chunk[i>0], re-resolve any parent var created in a previous chunk via
+ *    `figma.getNodeByIdAsync(_idMap[parentVar])`.
+ * 4. Image hybrid (Brain Q2-D) : per-chunk prelude calls `figma.createImageAsync(src)` for all
+ *    image URLs in this chunk and stores hashes in `_img_map`. IMAGE paints look up hash at fill-set
+ *    time; fallback = no IMAGE paint + name prefix `IMAGE:` for debugging.
  *
- * Scope v0.1 (S62 Brain-proxy decisions documented in handoff S62) :
- * - FRAME / GROUP / TEXT / RECTANGLE / VECTOR (via createNodeFromSvg)
- * - SOLID fills + strokes + cornerRadius
- * - Page-per-site (Brain Q1=B) — emit creates new page named after source_url
- * - Image fills SKIPPED (Brain Q2=A) — emits placeholder RECT with name "IMAGE:src=..."
- * - No font preload (Brain v0.1) — uses figma.loadFontAsync lazily per text node ;
- *   fallback Inter if family unavailable
- * - No multi-call chunking — entire script ; client splits via use_figma 10-op rule if needed
- * - No re-parenting pass — children inline via appendChild
+ * Client-side threading (recipe.md explains in detail) :
+ * - chunks[0] returns `{ page_id, id_map: { nX: "real_id", ... }, createdNodeIds }`.
+ * - For each chunk[i>0] : client substitutes `__EBM_PAGE_ID__` with page_id (literal string) and
+ *   `__EBM_ID_MAP_JSON__` with JSON.stringify(idMap accumulated so far) — then runs use_figma.
+ * - chunk[i>0] returns its own `{ id_map_additions, createdNodeIds }` which the client merges
+ *   into the running idMap before invoking the next chunk.
  *
- * Deferred v0.2+ (S63) :
- * - Image hybrid Brain Q2-C parallel generate_figma_design imageHash capture
- * - Chunking + idMap re-parent pass for 137+ node bundles
- * - Variable bindings, Code Connect, effect shadows
+ * v0.1.1 (S65) figma-use compat preserved : no IIFE wrap, setCurrentPageAsync, no figma.notify,
+ * paint color {r,g,b} + paint-level opacity, createdNodeIds returned.
  *
- * Spec : research/PROBE-PHASE3-FIGMA-IMPORTER-S62.md (v0.1 = MVP Q3=A 3j scope).
+ * Spec : research/PROBE-PHASE3-FIGMA-IMPORTER-S62.md.
  */
 import type { FigmaDocument, FigmaNode, FigmaPaint, FigmaColor } from "../extractors/figma.js";
 
 export interface EmitOptions {
   /** Page name override. Defaults to bundle.source_url. */
   pageName?: string;
-  /** Deprecated in v0.1.1 (figma.notify throws "not implemented" in use_figma). Ignored. */
+  /** Max bytes per chunk (default 40 * 1024 = 40KB, under use_figma 50KB cap). */
+  maxBytesPerChunk?: number;
+  /** Deprecated v0.1.1 (figma.notify throws inside use_figma). Ignored. */
   emitNotify?: boolean;
 }
 
-export interface EmitResult {
-  /** The JS source string ready to pass to use_figma({ code }). */
+export interface EmitChunk {
+  index: number;
   code: string;
-  /** Estimated logical-op count (figma.createX calls). Client uses for chunk planning. */
+  bytes: number;
+  /** Number of figma.createX ops in this chunk. */
+  ops: number;
+  /** Number of image preloads in this chunk. */
+  image_count: number;
+  /** True if chunk requires __EBM_PAGE_ID__ + __EBM_ID_MAP_JSON__ substitution (chunks[i>0]). */
+  needs_substitution: boolean;
+  /** Vars (e.g. "n5") that this chunk re-resolves from a previous chunk's idMap. */
+  imported_parent_vars: string[];
+}
+
+export interface EmitResult {
+  /** Self-contained chunks (chunks[0] runs first; chunks[i>0] need substitution). */
+  chunks: EmitChunk[];
+  /** Back-compat shortcut. Always equals chunks[0].code. */
+  code: string;
   estimatedOps: number;
-  /** Warnings emitted at compile time (image skips, unsupported types, etc.). */
   warnings: { kind: string; count: number; hint: string }[];
 }
+
+const PAGE_ID_PLACEHOLDER = "__EBM_PAGE_ID__";
+const ID_MAP_PLACEHOLDER = "__EBM_ID_MAP_JSON__";
+const DEFAULT_MAX_BYTES_PER_CHUNK = 40 * 1024;
 
 function safeJson(value: unknown): string {
   return JSON.stringify(value);
@@ -48,7 +69,7 @@ function flattenColorRgb(c: FigmaColor): string {
   return `{ r: ${c.r}, g: ${c.g}, b: ${c.b} }`;
 }
 
-function emitPaint(p: FigmaPaint): string | null {
+function emitSolidOrGradientPaint(p: FigmaPaint): string | null {
   if (p.type === "SOLID" && p.color) {
     const a = p.color.a;
     const opacitySuffix = a !== undefined && a < 1 ? `, opacity: ${a}` : "";
@@ -60,145 +81,324 @@ function emitPaint(p: FigmaPaint): string | null {
   return null;
 }
 
-function emitNode(
+interface NodeEmit {
+  var: string;
+  parentVar: string;
+  /** Create + config lines WITHOUT the appendChild line. */
+  createLines: string[];
+  /** Image URLs referenced by IMAGE paint fills (for prelude). */
+  imageUrls: string[];
+  /** Counted ops (createX call count = 1). */
+  ops: number;
+  /** Warnings raised during emit. */
+  warnings: Map<string, number>;
+}
+
+function emitNodeFlat(
   node: FigmaNode,
   parentVar: string,
-  counter: { i: number; ops: number; warnings: Map<string, number>; ids: string[] }
-): string {
-  const v = `n${counter.i++}`;
-  counter.ids.push(v);
+  varCounter: { i: number },
+  out: NodeEmit[],
+): void {
+  const v = `n${varCounter.i++}`;
   const lines: string[] = [];
+  const warnings = new Map<string, number>();
+  const imageUrls: string[] = [];
   const { x, y, width, height } = node.absoluteBoundingBox;
+  let ops = 0;
 
   switch (node.type) {
     case "FRAME":
     case "GROUP": {
-      const ctor = node.type === "FRAME" ? "createFrame" : "createFrame";
-      lines.push(`  const ${v} = figma.${ctor}();`);
-      counter.ops++;
+      lines.push(`const ${v} = figma.createFrame();`);
+      ops++;
       break;
     }
     case "RECTANGLE": {
-      lines.push(`  const ${v} = figma.createRectangle();`);
-      counter.ops++;
+      lines.push(`const ${v} = figma.createRectangle();`);
+      ops++;
       break;
     }
     case "TEXT": {
       const family = node.style?.fontFamily ?? "Inter";
       const weightNum = node.style?.fontWeight ?? 400;
       const styleStr = weightNum >= 700 ? "Bold" : weightNum >= 600 ? "Semi Bold" : weightNum >= 500 ? "Medium" : "Regular";
-      lines.push(`  const ${v} = figma.createText();`);
-      lines.push(`  try { await figma.loadFontAsync({ family: ${safeJson(family)}, style: ${safeJson(styleStr)} }); ${v}.fontName = { family: ${safeJson(family)}, style: ${safeJson(styleStr)} }; }`);
-      lines.push(`  catch (e) { await figma.loadFontAsync({ family: "Inter", style: ${safeJson(styleStr)} }); ${v}.fontName = { family: "Inter", style: ${safeJson(styleStr)} }; }`);
+      lines.push(`const ${v} = figma.createText();`);
+      lines.push(`try { await figma.loadFontAsync({ family: ${safeJson(family)}, style: ${safeJson(styleStr)} }); ${v}.fontName = { family: ${safeJson(family)}, style: ${safeJson(styleStr)} }; }`);
+      lines.push(`catch (e) { await figma.loadFontAsync({ family: "Inter", style: ${safeJson(styleStr)} }); ${v}.fontName = { family: "Inter", style: ${safeJson(styleStr)} }; }`);
       if (node.characters !== undefined) {
-        lines.push(`  ${v}.characters = ${safeJson(node.characters)};`);
+        lines.push(`${v}.characters = ${safeJson(node.characters)};`);
       }
       if (node.style?.fontSize !== undefined) {
-        lines.push(`  ${v}.fontSize = ${node.style.fontSize};`);
+        lines.push(`${v}.fontSize = ${node.style.fontSize};`);
       }
-      counter.ops++;
+      ops++;
       break;
     }
     case "VECTOR": {
       if (node.svgOuterHtml) {
-        lines.push(`  const ${v} = figma.createNodeFromSvg(${safeJson(node.svgOuterHtml)});`);
-        counter.ops++;
+        // Collapse newlines + indent to single space — SVG is whitespace-tolerant, avoids
+        // transport mangling of `\n` escapes in multi-KB use_figma `code` arg.
+        const collapsed = node.svgOuterHtml.replace(/\s+/g, " ").trim();
+        lines.push(`const ${v} = figma.createNodeFromSvg(${safeJson(collapsed)});`);
+        ops++;
       } else {
-        lines.push(`  const ${v} = figma.createRectangle(); // VECTOR without svgOuterHtml — fallback`);
-        counter.warnings.set("vector_no_svg", (counter.warnings.get("vector_no_svg") ?? 0) + 1);
-        counter.ops++;
+        lines.push(`const ${v} = figma.createRectangle(); // VECTOR without svgOuterHtml — fallback`);
+        warnings.set("vector_no_svg", (warnings.get("vector_no_svg") ?? 0) + 1);
+        ops++;
       }
       break;
     }
     default: {
-      lines.push(`  const ${v} = figma.createFrame(); // ${node.type} unsupported v0.1`);
-      counter.warnings.set("unsupported_type", (counter.warnings.get("unsupported_type") ?? 0) + 1);
-      counter.ops++;
+      lines.push(`const ${v} = figma.createFrame(); // ${node.type} unsupported v0.2`);
+      warnings.set("unsupported_type", (warnings.get("unsupported_type") ?? 0) + 1);
+      ops++;
     }
   }
 
-  lines.push(`  ${v}.name = ${safeJson(node.name)};`);
-  lines.push(`  ${v}.x = ${x}; ${v}.y = ${y};`);
+  lines.push(`${v}.name = ${safeJson(node.name)};`);
+  lines.push(`${v}.x = ${x}; ${v}.y = ${y};`);
   if (width > 0 && height > 0 && node.type !== "TEXT") {
-    lines.push(`  ${v}.resize(${width}, ${height});`);
+    lines.push(`${v}.resize(${width}, ${height});`);
   }
 
   if (node.fills && node.fills.length > 0) {
-    const hasImage = node.fills.some((p) => p.type === "IMAGE");
-    if (hasImage) {
-      counter.warnings.set("image_skipped", (counter.warnings.get("image_skipped") ?? 0) + 1);
-      lines.push(`  ${v}.name = ${safeJson(`IMAGE:${node.name}`)};`);
+    const fillExprs: string[] = [];
+    let imageSrc: string | null = null;
+
+    for (const p of node.fills) {
+      if (p.type === "IMAGE" && p.imageRef) {
+        imageSrc = p.imageRef;
+        imageUrls.push(p.imageRef);
+        const scaleMode = p.scaleMode ?? "FILL";
+        fillExprs.push(
+          `...(_img_map.get(${safeJson(p.imageRef)}) ? [{ type: "IMAGE", imageHash: _img_map.get(${safeJson(p.imageRef)}), scaleMode: ${safeJson(scaleMode)} }] : [])`,
+        );
+        continue;
+      }
+      const e = emitSolidOrGradientPaint(p);
+      if (e !== null) fillExprs.push(e);
     }
-    const paints = node.fills.map(emitPaint).filter((s): s is string => s !== null);
-    if (paints.length > 0) {
-      lines.push(`  ${v}.fills = [${paints.join(", ")}];`);
+
+    if (imageSrc !== null) {
+      lines.push(`if (!_img_map.get(${safeJson(imageSrc)})) ${v}.name = ${safeJson(`IMAGE:${node.name}`)};`);
+    }
+
+    if (fillExprs.length > 0) {
+      lines.push(`${v}.fills = [${fillExprs.join(", ")}];`);
     }
   }
 
   if (node.cornerRadius !== undefined && node.type === "RECTANGLE") {
-    lines.push(`  ${v}.cornerRadius = ${node.cornerRadius};`);
+    lines.push(`${v}.cornerRadius = ${node.cornerRadius};`);
   } else if (node.rectangleCornerRadii && node.type === "RECTANGLE") {
     const [tl, tr, br, bl] = node.rectangleCornerRadii;
-    lines.push(`  ${v}.topLeftRadius = ${tl}; ${v}.topRightRadius = ${tr}; ${v}.bottomRightRadius = ${br}; ${v}.bottomLeftRadius = ${bl};`);
+    lines.push(`${v}.topLeftRadius = ${tl}; ${v}.topRightRadius = ${tr}; ${v}.bottomRightRadius = ${br}; ${v}.bottomLeftRadius = ${bl};`);
   }
 
   if (node.clipsContent !== undefined && (node.type === "FRAME" || node.type === "GROUP")) {
-    lines.push(`  ${v}.clipsContent = ${node.clipsContent};`);
+    lines.push(`${v}.clipsContent = ${node.clipsContent};`);
   }
+
+  out.push({ var: v, parentVar, createLines: lines, imageUrls, ops, warnings });
 
   if (node.children && node.children.length > 0 && (node.type === "FRAME" || node.type === "GROUP")) {
     for (const child of node.children) {
-      lines.push(emitNode(child, v, counter));
+      emitNodeFlat(child, v, varCounter, out);
     }
   }
+}
 
-  lines.push(`  ${parentVar}.appendChild(${v});`);
+interface ChunkPack {
+  emits: NodeEmit[];
+  bytes: number;
+}
 
-  return lines.join("\n");
+function packEmitsIntoChunks(emits: NodeEmit[], maxBytes: number, overheadReserve: number): ChunkPack[] {
+  const budget = maxBytes - overheadReserve;
+  const packs: ChunkPack[] = [];
+  let current: ChunkPack = { emits: [], bytes: 0 };
+  for (const e of emits) {
+    const sz = e.createLines.reduce((s, l) => s + l.length + 1, 0) + e.parentVar.length + e.var.length + 16; // ~ appendChild line size + padding
+    if (current.emits.length > 0 && current.bytes + sz > budget) {
+      packs.push(current);
+      current = { emits: [], bytes: 0 };
+    }
+    current.emits.push(e);
+    current.bytes += sz;
+  }
+  if (current.emits.length > 0) packs.push(current);
+  return packs;
+}
+
+function buildChunkCode(opts: {
+  pack: ChunkPack;
+  chunkIndex: number;
+  totalChunks: number;
+  isFirst: boolean;
+  pageName: string;
+  bundle: FigmaDocument;
+  vars_created_in_earlier_chunks: Set<string>;
+}): { code: string; importedParents: string[]; imageCount: number; ops: number; warnings: Map<string, number>; createdVars: string[] } {
+  const { pack, chunkIndex, totalChunks, isFirst, pageName, bundle, vars_created_in_earlier_chunks } = opts;
+  const lines: string[] = [];
+
+  // ── Comment header
+  lines.push(`// EBM Phase 3 v0.2 emitter — chunk ${chunkIndex + 1}/${totalChunks} (${isFirst ? "creates page" : "re-attaches page + idMap"})`);
+  lines.push(`// source: ${bundle.source_url}`);
+  if (isFirst) {
+    lines.push(`// captured_at: ${bundle.captured_at}`);
+  } else {
+    lines.push(`// substitution required: ${PAGE_ID_PLACEHOLDER} → page_id ; ${ID_MAP_PLACEHOLDER} → JSON of idMap accumulated so far`);
+  }
+
+  // ── Header : page setup
+  if (isFirst) {
+    lines.push(`const page = figma.createPage();`);
+    lines.push(`page.name = ${safeJson(pageName)};`);
+    lines.push(`await figma.setCurrentPageAsync(page);`);
+    lines.push(`const _idMap = {};`);
+  } else {
+    lines.push(`const page = (await figma.getNodeByIdAsync(${safeJson(PAGE_ID_PLACEHOLDER)}));`);
+    lines.push(`if (!page || page.type !== "PAGE") throw new Error("EBM chunk: page not found by id " + ${safeJson(PAGE_ID_PLACEHOLDER)});`);
+    lines.push(`await figma.setCurrentPageAsync(page);`);
+    lines.push(`const _idMap = ${ID_MAP_PLACEHOLDER};`);
+  }
+
+  // ── Re-resolve imported parent vars (parents created in earlier chunks but used in this chunk)
+  const importedParents: string[] = [];
+  const localVars = new Set(pack.emits.map((e) => e.var));
+  const neededParents = new Set<string>();
+  for (const e of pack.emits) {
+    if (e.parentVar !== "page" && !localVars.has(e.parentVar)) {
+      neededParents.add(e.parentVar);
+    }
+  }
+  for (const p of neededParents) {
+    if (!vars_created_in_earlier_chunks.has(p)) {
+      throw new Error(`EBM emit invariant: parent var ${p} referenced in chunk ${chunkIndex} but not created in any earlier chunk`);
+    }
+    lines.push(`const ${p} = (await figma.getNodeByIdAsync(_idMap[${safeJson(p)}]));`);
+    lines.push(`if (!${p}) throw new Error("EBM chunk: parent ${p} not found in idMap");`);
+    importedParents.push(p);
+  }
+
+  // ── Image prelude
+  // Runtime feature-check : figma.createImageAsync exists in standalone Plugin API but is NOT
+  // exposed in the use_figma sandbox (verified S66). If unavailable → leave _img_map empty,
+  // node fills skip IMAGE paint, name prefix `IMAGE:` marks placeholder. Real bitmap import
+  // requires upload_assets MCP (server-side) or inline base64 — deferred S67+.
+  const allImageUrls = Array.from(new Set(pack.emits.flatMap((e) => e.imageUrls)));
+  if (allImageUrls.length === 0) {
+    lines.push(`const _img_map = new Map();`);
+  } else {
+    lines.push(`const _img_urls = ${safeJson(allImageUrls)};`);
+    lines.push(`const _img_map = new Map();`);
+    lines.push(`if (typeof figma.createImageAsync === "function") {`);
+    lines.push(`  const _img_results = await Promise.all(_img_urls.map((u) => figma.createImageAsync(u).then((i) => i.hash).catch(() => null)));`);
+    lines.push(`  for (let i = 0; i < _img_urls.length; i++) _img_map.set(_img_urls[i], _img_results[i]);`);
+    lines.push(`}`);
+  }
+
+  // ── Node creates + configs + appendChild
+  const ops = pack.emits.reduce((s, e) => s + e.ops, 0);
+  const warningAgg = new Map<string, number>();
+  const createdVars: string[] = [];
+  for (const e of pack.emits) {
+    for (const l of e.createLines) lines.push(`  ${l}`);
+    lines.push(`  ${e.parentVar}.appendChild(${e.var});`);
+    lines.push(`  _idMap[${safeJson(e.var)}] = ${e.var}.id;`);
+    createdVars.push(e.var);
+    for (const [k, v] of e.warnings) warningAgg.set(k, (warningAgg.get(k) ?? 0) + v);
+  }
+
+  // ── Footer
+  const idsArr = `[${createdVars.map((v) => `${v}.id`).join(", ")}]`;
+  if (isFirst) {
+    lines.push(`return { page_id: page.id, node_count: ${createdVars.length}, createdNodeIds: ${idsArr}, id_map: _idMap };`);
+  } else {
+    lines.push(`return { page_id: page.id, node_count: ${createdVars.length}, createdNodeIds: ${idsArr}, id_map_additions: _idMap };`);
+  }
+
+  return {
+    code: lines.join("\n"),
+    importedParents,
+    imageCount: allImageUrls.length,
+    ops,
+    warnings: warningAgg,
+    createdVars,
+  };
 }
 
 export function emitFigmaPluginCode(bundle: FigmaDocument, opts: EmitOptions = {}): EmitResult {
   const pageName = opts.pageName ?? bundle.source_url.slice(0, 80);
-  const counter = { i: 0, ops: 0, warnings: new Map<string, number>(), ids: [] as string[] };
+  const maxBytes = opts.maxBytesPerChunk ?? DEFAULT_MAX_BYTES_PER_CHUNK;
   const canvas = bundle.document.children[0];
   const rootNodes = canvas.children;
 
-  const nodeBlocks = rootNodes.map((n) => emitNode(n, "page", counter));
+  // Step 1 — flat emit (pre-order traversal, page-rooted)
+  const flatEmits: NodeEmit[] = [];
+  const varCounter = { i: 0 };
+  for (const root of rootNodes) {
+    emitNodeFlat(root, "page", varCounter, flatEmits);
+  }
 
-  // figma-use compat (v0.1.1) :
-  //  - NO IIFE wrap (use_figma auto-wraps in async + captures return)
-  //  - setCurrentPageAsync (sync setter throws)
-  //  - NO figma.notify (throws "not implemented")
-  //  - return createdNodeIds per figma-use rule #15
-  const header = [
-    `// EBM Phase 3 v0.1.1 emitter — auto-generated from bundle ${bundle.schema}`,
-    `// source: ${bundle.source_url}`,
-    `// captured_at: ${bundle.captured_at}`,
-    `// nodes: ${bundle.metrics.nodes}, viewport: ${bundle.viewport.width}x${bundle.viewport.height}`,
-    `const page = figma.createPage();`,
-    `page.name = ${safeJson(pageName)};`,
-    `await figma.setCurrentPageAsync(page);`,
-  ].join("\n");
+  // Step 2 — bin-pack flat sequence into chunks
+  const overheadReserve = 2 * 1024;
+  const packs = packEmitsIntoChunks(flatEmits, maxBytes, overheadReserve);
 
-  const idsArray = counter.ids.length
-    ? `[${counter.ids.map((id) => `${id}.id`).join(", ")}]`
-    : "[]";
-  const footer = `return { page_id: page.id, node_count: ${counter.i}, createdNodeIds: ${idsArray} };`;
+  // Step 3 — assemble chunks with idMap re-resolve
+  const varsCreatedInEarlierChunks = new Set<string>();
+  const aggregatedWarnings = new Map<string, number>();
+  let totalOps = 0;
+  const chunks: EmitChunk[] = packs.map((pack, idx) => {
+    const built = buildChunkCode({
+      pack,
+      chunkIndex: idx,
+      totalChunks: packs.length,
+      isFirst: idx === 0,
+      pageName,
+      bundle,
+      vars_created_in_earlier_chunks: varsCreatedInEarlierChunks,
+    });
+    totalOps += built.ops;
+    for (const [k, v] of built.warnings) {
+      aggregatedWarnings.set(k, (aggregatedWarnings.get(k) ?? 0) + v);
+    }
+    for (const v of built.createdVars) varsCreatedInEarlierChunks.add(v);
+    return {
+      index: idx,
+      code: built.code,
+      bytes: Buffer.byteLength(built.code, "utf8"),
+      ops: built.ops,
+      image_count: built.imageCount,
+      needs_substitution: idx > 0,
+      imported_parent_vars: built.importedParents,
+    };
+  });
 
-  const code = [header, ...nodeBlocks, footer].join("\n");
+  const totalImages = chunks.reduce((s, c) => s + c.image_count, 0);
+  if (totalImages > 0) {
+    aggregatedWarnings.set("image_hybrid_inline", totalImages);
+  }
 
-  const warnings = Array.from(counter.warnings.entries()).map(([kind, count]) => ({
+  const warnings = Array.from(aggregatedWarnings.entries()).map(([kind, count]) => ({
     kind,
     count,
     hint:
-      kind === "image_skipped"
-        ? "IMAGE fills skipped in v0.1 (Brain Q2=A). Defer v0.2 via Brain Q2-C parallel generate_figma_design imageHash capture."
+      kind === "image_hybrid_inline"
+        ? "v0.2 Q2-D : emit calls figma.createImageAsync(src) IF available at runtime. Sandbox may not expose it (verified S66 use_figma sandbox does NOT). Fallback : no IMAGE paint + name prefix IMAGE: as debug marker. Real bitmaps require upload_assets MCP or inline base64 (S67+)."
         : kind === "vector_no_svg"
           ? "VECTOR node missing svgOuterHtml — emitted RECT fallback."
           : kind === "unsupported_type"
-            ? "FigmaNode.type unsupported in v0.1 emitter — emitted FRAME fallback."
+            ? "FigmaNode.type unsupported in v0.2 emitter — emitted FRAME fallback."
             : "Unknown warning.",
   }));
 
-  return { code, estimatedOps: counter.ops, warnings };
+  return {
+    chunks,
+    code: chunks[0]?.code ?? "",
+    estimatedOps: totalOps,
+    warnings,
+  };
 }

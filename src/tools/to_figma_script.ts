@@ -1,27 +1,32 @@
 /**
- * Phase 3 v0.1 MCP tool — `to_figma_script`
+ * Phase 3 v0.2 MCP tool — `to_figma_script` (chunked + image hybrid).
  *
  * Wraps `to_figma` (bundle generation) + `emitFigmaPluginCode` (code emit).
- * Returns ready-to-paste Plugin API JS string for use_figma client-side call.
+ * Returns chunks[] of self-contained Plugin API JS strings for use_figma client-side calls.
  *
- * Client-side dance (Claude main thread or any MCP orchestrator) :
+ * Client-side dance (v0.2) :
  *   1. mcp call eclectique-browser-mcp.to_figma_script({ url })
- *      → returns { code, page_name, estimated_ops, warnings, recipe_md }
+ *      → returns { chunks: [{code, needs_page_id, ...}], code (back-compat = chunks[0].code), ... }
  *   2. mcp call claude_ai_Figma.create_new_file({ plan_key, file_name })
  *      → returns { file_key, file_url }
- *   3. mcp call claude_ai_Figma.use_figma({ skillNames: "figma-use", code })
- *      → executes Plugin API inside the new file
- *   4. User opens file_url, sees frames imported.
+ *   3. mcp call claude_ai_Figma.use_figma({ skillNames: "figma-use", code: chunks[0].code })
+ *      → executes chunk 0, returns { page_id, node_count, createdNodeIds }
+ *   4. For i in 1..chunks.length-1 :
+ *        code_i = chunks[i].code.replaceAll("__EBM_PAGE_ID__", page_id)
+ *        mcp call claude_ai_Figma.use_figma({ skillNames: "figma-use", code: code_i })
+ *   5. User opens file_url, sees all frames imported (text + SVG + images).
  *
  * Architecture rationale : EBM is a MCP server, not a client. use_figma +
  * create_new_file live in the Claude.ai Figma MCP (separate server).
- * EBM provides the bundle + the emitted script ; orchestration is consumer-side.
+ * EBM provides the bundle + the emitted chunks ; orchestration is consumer-side.
  */
 import { z } from "zod";
 import { toFigma, type ToFigmaResult } from "./to_figma.js";
-import { emitFigmaPluginCode, type EmitResult } from "../lib/figma_emit.js";
+import { emitFigmaPluginCode, type EmitResult, type EmitChunk } from "../lib/figma_emit.js";
 
 const PASTE_HTML_MAX_BYTES = 8 * 1024 * 1024;
+const PAGE_ID_PLACEHOLDER = "__EBM_PAGE_ID__";
+const ID_MAP_PLACEHOLDER = "__EBM_ID_MAP_JSON__";
 
 export const ToFigmaScriptInput = z
   .object({
@@ -40,12 +45,13 @@ export const ToFigmaScriptInput = z
     pre_render_delay_ms: z.number().int().nonnegative().default(0),
     max_nodes: z.number().int().positive().max(10000).default(800),
     page_name: z.string().min(1).max(200).optional(),
+    max_bytes_per_chunk: z.number().int().positive().max(50 * 1024).default(40 * 1024),
     emit_notify: z.boolean().default(true),
     include_recipe: z.boolean().default(true),
   })
   .refine(
     (d) => [d.url, d.html, d.html_path].filter((v) => typeof v === "string" && v.length > 0).length === 1,
-    { message: "provide exactly one of `url` | `html` | `html_path` (mutually exclusive)" }
+    { message: "provide exactly one of `url` | `html` | `html_path` (mutually exclusive)" },
   );
 export type ToFigmaScriptInput = z.infer<typeof ToFigmaScriptInput>;
 
@@ -53,7 +59,14 @@ export interface ToFigmaScriptResult {
   schema: "cbm/figma-script/v0";
   source_url: string;
   page_name: string;
+  /** Self-contained chunks — chunks[0] runs first ; chunks[i>0] need __EBM_PAGE_ID__ substituted. */
+  chunks: EmitChunk[];
+  /** Back-compat shortcut. Always equals chunks[0].code. For 1-chunk bundles, single use_figma call suffices. */
   code: string;
+  /** Sentinel placeholder for page_id substitution in chunks[i>0]. */
+  page_id_placeholder: typeof PAGE_ID_PLACEHOLDER;
+  /** Sentinel placeholder for idMap JSON substitution in chunks[i>0]. */
+  id_map_placeholder: typeof ID_MAP_PLACEHOLDER;
   estimated_ops: number;
   bundle_warnings: ToFigmaResult["document"]["warnings"];
   emit_warnings: EmitResult["warnings"];
@@ -61,11 +74,16 @@ export interface ToFigmaScriptResult {
   recipe_md?: string;
 }
 
-const RECIPE_TEMPLATE = (pageName: string, ops: number, codeLen: number) => `# Phase 3 v0.1.1 import recipe — \`to_figma_script\`
+const RECIPE_TEMPLATE = (pageName: string, chunks: EmitChunk[]) => {
+  const totalOps = chunks.reduce((s, c) => s + c.ops, 0);
+  const totalImages = chunks.reduce((s, c) => s + c.image_count, 0);
+  const isMulti = chunks.length > 1;
+  return `# Phase 3 v0.2 import recipe — \`to_figma_script\` (chunked + image hybrid)
 
-EBM produced a Plugin API script. Run it inside a Figma file via the Claude.ai Figma MCP.
+EBM produced **${chunks.length} chunk${chunks.length === 1 ? "" : "s"}** of Plugin API code (total: ~${totalOps} ops, ${totalImages} image${totalImages === 1 ? "" : "s"}).
 
 ## Step 1 — Create file
+
 \`\`\`
 claude_ai_Figma.create_new_file({
   plan_key: "team::1106776370504962855",
@@ -74,34 +92,66 @@ claude_ai_Figma.create_new_file({
 })
 \`\`\`
 
-## Step 2 — Run emitter script
-Paste the \`code\` field (length: ${codeLen} chars, ~${ops} logical ops) into use_figma :
+## Step 2 — Run chunk 0 (creates page)
 
 \`\`\`
 claude_ai_Figma.use_figma({
   skillNames: "figma-use",
-  code: <the code field from this tool's response>
+  code: <chunks[0].code from this tool's response>
 })
 \`\`\`
 
+→ returns \`{ page_id, node_count, createdNodeIds, id_map }\`. **Capture \`page_id\` AND \`id_map\`** for next steps.
+${
+  isMulti
+    ? `
+## Step 3 — Run chunks 1..${chunks.length - 1} (re-attach page + idMap)
+
+Maintain a rolling \`id_map_accumulated\` (initialize from chunks[0].id_map). For each chunk \`i\` in 1..${chunks.length - 1} :
+
+\`\`\`
+const code_i = chunks[i].code
+  .replaceAll("${PAGE_ID_PLACEHOLDER}", page_id)
+  .replaceAll("${ID_MAP_PLACEHOLDER}", JSON.stringify(id_map_accumulated));
+const result_i = await claude_ai_Figma.use_figma({
+  skillNames: "figma-use",
+  code: code_i
+});
+Object.assign(id_map_accumulated, result_i.id_map_additions);
+\`\`\`
+
+Each chunk[i>0] starts by re-attaching the existing page via \`figma.getNodeByIdAsync(page_id)\` and re-grabbing any parent nodes created in earlier chunks via the idMap. Run chunks sequentially.
+`
+    : `
+## (Single chunk — no further steps)
+
+This bundle fits in one chunk (~${chunks[0]?.bytes ?? 0} bytes ≤ 50KB use_figma cap). The back-compat \`code\` field equals \`chunks[0].code\`.
+`
+}
 > **figma-use skill is MANDATORY before any use_figma call** — load it via Skill tool.
 
-## Caveats v0.1.1
-- Image fills SKIPPED (Brain Q2=A) — emitted RECT placeholders named \`IMAGE:...\`.
-- No multi-call chunking — if ops > 30, client should split the script per Figma's 10-op recommendation (split at \`page.appendChild\` boundaries).
-- Font fallback to Inter if requested family unavailable on Figma desktop.
-- VECTOR fallback to RECT if \`svgOuterHtml\` missing.
+## Image hybrid (v0.2 Q2-D)
+- Each chunk's prelude calls \`figma.createImageAsync(src)\` for every image URL in its scope and stores hashes in \`_img_map\`.
+- IMAGE paints reference \`_img_map.get(src)\` at fill-set time. On CORS/404/silent-reject, the paint is skipped and the node name is prefixed with \`IMAGE:\` as debug marker (frame remains a placeholder).
+- Risks : 4096px max, hot-link-protected URLs reject silently — see handoff S66.
 
-## figma-use compat fixes (v0.1.1, S63)
-- Removed IIFE wrap (\`(async () => {...})()\`) — use_figma auto-wraps in async + captures \`return\`.
-- \`figma.setCurrentPage(page)\` → \`await figma.setCurrentPageAsync(page)\` (sync setter throws).
-- \`figma.notify(...)\` removed — throws "not implemented" inside use_figma.
-- SOLID paint color stripped to \`{r,g,b}\` (no \`a\` field) — alpha lifted to paint-level \`opacity\` if < 1.
-- Return now includes \`createdNodeIds\` array per figma-use rule #15.
+## Caveats v0.2
+- VECTOR fallback to RECT if \`svgOuterHtml\` missing.
+- Font fallback to Inter if requested family unavailable on Figma desktop.
+- chunks[i>0] require BOTH literal \`${PAGE_ID_PLACEHOLDER}\` (page id) AND \`${ID_MAP_PLACEHOLDER}\` (JSON of accumulated idMap) substitution — do NOT skip either (will throw at runtime).
+
+## figma-use compat (v0.1.1+, S65 baseline)
+- No IIFE wrap (use_figma auto-wraps + captures \`return\`).
+- \`await figma.setCurrentPageAsync(page)\` (sync setter throws).
+- No \`figma.notify(...)\` (throws "not implemented").
+- SOLID paint color is \`{r,g,b}\` only ; alpha as paint-level \`opacity\` field.
+- Result includes \`createdNodeIds\` array per figma-use rule #15.
 
 ## Verification
-After step 2, open \`file_url\` returned by step 1 in Figma desktop. Frames should appear at absolute coords matching capture viewport.
+
+After all chunks executed, open \`file_url\` returned by step 1 in Figma desktop. Frames at absolute coords matching capture viewport ; images rendered as bitmaps (or RECT placeholders named \`IMAGE:\` if URL failed).
 `;
+};
 
 export async function toFigmaScript(rawInput: unknown): Promise<ToFigmaScriptResult> {
   const input = ToFigmaScriptInput.parse(rawInput);
@@ -123,6 +173,7 @@ export async function toFigmaScript(rawInput: unknown): Promise<ToFigmaScriptRes
   const pageName = input.page_name ?? bundle.source_url.slice(0, 80);
   const emit = emitFigmaPluginCode(bundle, {
     pageName,
+    maxBytesPerChunk: input.max_bytes_per_chunk,
     emitNotify: input.emit_notify,
   });
 
@@ -130,11 +181,14 @@ export async function toFigmaScript(rawInput: unknown): Promise<ToFigmaScriptRes
     schema: "cbm/figma-script/v0",
     source_url: bundle.source_url,
     page_name: pageName,
+    chunks: emit.chunks,
     code: emit.code,
+    page_id_placeholder: PAGE_ID_PLACEHOLDER,
+    id_map_placeholder: ID_MAP_PLACEHOLDER,
     estimated_ops: emit.estimatedOps,
     bundle_warnings: bundle.warnings,
     emit_warnings: emit.warnings,
     metrics: bundle.metrics,
-    ...(input.include_recipe ? { recipe_md: RECIPE_TEMPLATE(pageName, emit.estimatedOps, emit.code.length) } : {}),
+    ...(input.include_recipe ? { recipe_md: RECIPE_TEMPLATE(pageName, emit.chunks) } : {}),
   };
 }

@@ -1,6 +1,6 @@
 {
   "name": "eclectique-browser-mcp",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "module": "index.ts",
   "type": "module",
   "private": true,
@@ -13,6 +13,7 @@
     "smoke:fonts": "bun test/smoke-fonts-v0.8.ts",
     "smoke:script": "bun test/smoke-figma-script.ts",
     "smoke:script:slim": "bun test/smoke-figma-script-slim.ts",
+    "smoke:script:full": "bun test/smoke-figma-script-full.ts",
     "consolidate": "bun test/consolidate.ts",
     "typecheck": "tsc --noEmit"
   },
