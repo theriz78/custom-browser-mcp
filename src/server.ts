@@ -8,11 +8,12 @@ import { analyzePage } from "./tools/analyze_page.js";
 import { toClaude } from "./tools/to_claude.js";
 import { toFigma } from "./tools/to_figma.js";
 import { seedAuthSession } from "./tools/seed_auth.js";
+import { toFigmaScript } from "./tools/to_figma_script.js";
 import { closeSharedContext } from "./lib/browser.js";
 import { wrapUntrusted } from "./lib/untrusted.js";
 
 const SERVER_NAME = "eclectique-browser-mcp";
-const SERVER_VERSION = "0.8.0";
+const SERVER_VERSION = "0.10.0";
 
 const SOURCE_SCHEMA_PROPS = {
   url: { type: "string", description: "Public http(s):// URL to load. XOR with `html` / `html_path`." },
@@ -173,8 +174,46 @@ const SEED_AUTH_TOOL = {
   },
 } as const;
 
+const TO_FIGMA_SCRIPT_TOOL = {
+  name: "to_figma_script",
+  description:
+    "Phase 3 v0.1 (v0.10.0): same input shape as `to_figma`, but emits a Figma Plugin API JS string (`code`) ready to paste into Claude.ai Figma MCP `use_figma({ skillNames: \"figma-use\", code })`. Pair with `create_new_file` to materialize the bundle as a real Figma file. Returns { schema, source_url, page_name, code, estimated_ops, bundle_warnings, emit_warnings, metrics, recipe_md }. Emitter scope v0.1 : FRAME/GROUP/TEXT/RECTANGLE/VECTOR via createNodeFromSvg + SOLID/GRADIENT_LINEAR/GRADIENT_RADIAL fills + cornerRadius + clipsContent + page-per-site. Image fills SKIPPED (deferred v0.2 hybrid generate_figma_design). No multi-call chunking (client splits if ops > 30 per Figma's 10-op rule).",
+  inputSchema: {
+    type: "object",
+    properties: {
+      ...SOURCE_SCHEMA_PROPS,
+      viewport: {
+        type: "object",
+        properties: {
+          width: { type: "integer", default: 1440 },
+          height: { type: "integer", default: 900 },
+        },
+      },
+      wait_until: { enum: ["load", "domcontentloaded", "networkidle"], default: "networkidle" },
+      timeout_ms: { type: "integer", default: 30000 },
+      pre_render_script: { type: "string" },
+      pre_render_delay_ms: { type: "integer", default: 0 },
+      max_nodes: { type: "integer", default: 800 },
+      page_name: {
+        type: "string",
+        description: "Override Figma page name (default: source_url truncated to 80 chars).",
+      },
+      emit_notify: {
+        type: "boolean",
+        default: true,
+        description: "Whether the emitted script ends with figma.notify(...) to surface metrics.",
+      },
+      include_recipe: {
+        type: "boolean",
+        default: true,
+        description: "Include a `recipe_md` markdown explaining the create_new_file + use_figma dance.",
+      },
+    },
+  },
+} as const;
+
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [ANALYZE_PAGE_TOOL, TO_CLAUDE_TOOL, TO_FIGMA_TOOL, SEED_AUTH_TOOL],
+  tools: [ANALYZE_PAGE_TOOL, TO_CLAUDE_TOOL, TO_FIGMA_TOOL, SEED_AUTH_TOOL, TO_FIGMA_SCRIPT_TOOL],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
@@ -200,6 +239,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const result = await seedAuthSession(req.params.arguments);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  }
+  if (req.params.name === "to_figma_script") {
+    const result = await toFigmaScript(req.params.arguments);
+    return {
+      content: [{ type: "text", text: wrapUntrusted(result.source_url, JSON.stringify(result, null, 2)) }],
     };
   }
   throw new Error(`Unknown tool: ${req.params.name}`);
