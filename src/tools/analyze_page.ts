@@ -4,7 +4,7 @@ import { AnalyzePageInput, Bundle, BUNDLE_SCHEMA_VERSION } from "../schemas/outp
 import { extractA11y } from "../extractors/a11y.js";
 import { extractTokens } from "../extractors/tokens.js";
 import { captureScreenshot } from "../extractors/screenshot.js";
-import { getSharedContext, closeSharedContext } from "../lib/browser.js";
+import { closeSharedContext, newPageForViewport } from "../lib/browser.js";
 import { acceptCookieConsent, clearCookiesAndStorage } from "../lib/cookies.js";
 import { resolveSource, loadIntoPage, cleanupSource } from "../lib/source.js";
 
@@ -31,8 +31,7 @@ export async function analyzePage(rawInput: unknown): Promise<Bundle> {
   const sid = snapshotId(source.label, started);
   const warnings: string[] = [];
 
-  const ctx = await getSharedContext(input.viewport);
-  const page = await ctx.newPage();
+  const { ctx, page } = await newPageForViewport(input.viewport);
   const bundle: Bundle = {
     schema_version: BUNDLE_SCHEMA_VERSION,
     url: source.label,

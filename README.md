@@ -2,7 +2,11 @@
 
 > Eclectique Browser MCP — turns any live URL **or pasted HTML / local file / zip** into a multi-output design bundle: a11y tree, design tokens, screenshot, Claude-consumable DSL, Figma REST JSON. Zero LLM API cost. Persistent Chromium context.
 
-**v0.9.0** (S62): Patchright NodeJS drop-in adopted per RFC-EBM-HYBRID-S61 verdict B. All `playwright` imports swapped to `patchright@1.59.4` (Apache-2.0, Vinyzu). API parity preserved (`launchPersistentContext`, `Page`, types). Anti-detect uplift: `Runtime.enable` CDP leak patched, `--disable-blink-features=AutomationControlled`, isolated ExecutionContexts. UDD doctrine + Bun runtime preserved. Smokes 5/5 PASS. Caveat: viewport mid-session switch + `file://` goto via `toClaude` wrapper hangs (workaround: stable viewport per session).
+**v0.10.1** (S63): 2 fixes — (1) `figma_emit.ts` v0.1.1 made `use_figma`-compatible : removed `(async () => {})()` IIFE wrap (use_figma auto-wraps), `figma.setCurrentPage(page)` → `await figma.setCurrentPageAsync(page)`, removed `figma.notify(…)` (throws "not implemented"), SOLID paint color stripped to `{r,g,b}` (alpha lifted to paint-level `opacity` if < 1), `return` now includes `createdNodeIds` per figma-use rule #15. Live E2E PASS — 16-node slim Awwwards SOTD bundle rendered into Eclectique team file `QGGVEcTSvHEHxf7g6zp9PB` (text + SVGs + frames at correct absolute coords). (2) Caveat #1 (Patchright UDD-reuse hang after 3+ consecutive `launchPersistentContext` on same `USER_DATA_DIR`) reproduced + worked around. `getSharedContext` no longer closes + relaunches on viewport mismatch ; new `newPageForViewport()` helper applies viewport per-page via `page.setViewportSize()`. Probe `test/probe-caveat1-fixed.ts` 5/5 PASS post-fix. Upstream Patchright issue [#201](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright/issues/201) filed.
+
+**v0.10.0** (S62): 5th MCP tool `to_figma_script` — Phase 3 v0.1 emit-only. Bundle → `use_figma`-pasteable Plugin API JS string + `recipe.md` (`create_new_file` → `use_figma` 2-step dance). Pure-TS emitter `src/lib/figma_emit.ts` covers FRAME/GROUP/TEXT/RECTANGLE/VECTOR + SOLID/GRADIENT_LINEAR/GRADIENT_RADIAL paints + cornerRadius + clipsContent + lazy `loadFontAsync` + Inter fallback. Image fills SKIPPED v0.1 (Brain Q2=A) — emitted RECT placeholders named `IMAGE:src=...`. No multi-call chunking v0.1. Defer v0.2 hybrid image capture S63+.
+
+**v0.9.0** (S62): Patchright NodeJS drop-in adopted per RFC-EBM-HYBRID-S61 verdict B. All `playwright` imports swapped to `patchright@1.59.4` (Apache-2.0, Vinyzu). API parity preserved (`launchPersistentContext`, `Page`, types). Anti-detect uplift: `Runtime.enable` CDP leak patched, `--disable-blink-features=AutomationControlled`, isolated ExecutionContexts. UDD doctrine + Bun runtime preserved. Smokes 5/5 PASS. ~~Caveat: viewport mid-session switch + `file://` goto via `toClaude` wrapper hangs~~ **FIXED v0.10.1** — see above.
 
 **v0.8.0** (S61): `seed_auth_session` headed-login tool (feature-to-steal #4 persistent UDD auth — bypass login-gated portals). Font extractor CSS-first upgrade (feature-to-steal #5): captures full `font-family` stack, `font-style` (italic), `@font-face` URLs, `source: system|webfont|unknown` classification, and Google-Fonts/Typekit link detection. `Bundle` schema → `v1.2.0` (TokensPayload extended).
 
@@ -17,7 +21,7 @@
 
 ---
 
-## Tools (3)
+## Tools (5)
 
 ### Source inputs (v0.7.0) — all 3 tools
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { extractClaudeBundle, type ClaudeBundle, type ClaudeNode } from "../extractors/htmltoclaude.js";
 import { bundleToFigma, type FigmaDocument } from "../extractors/figma.js";
-import { getSharedContext, closeSharedContext } from "../lib/browser.js";
+import { closeSharedContext, newPageForViewport } from "../lib/browser.js";
 import { acceptCookieConsent, clearCookiesAndStorage } from "../lib/cookies.js";
 import { CookieConsentMode, type CookieConsentLog } from "../schemas/output.js";
 import { resolveSource, loadIntoPage, cleanupSource } from "../lib/source.js";
@@ -66,8 +66,7 @@ export async function toFigma(rawInput: unknown): Promise<ToFigmaResult> {
     allow_private_urls: input.allow_private_urls,
   });
   const started = Date.now();
-  const ctx = await getSharedContext(input.viewport);
-  const page = await ctx.newPage();
+  const { ctx, page } = await newPageForViewport(input.viewport);
   let document: FigmaDocumentWithCookies | null = null;
   try {
     await loadIntoPage(page, source, { waitUntil: input.wait_until, timeoutMs: input.timeout_ms });

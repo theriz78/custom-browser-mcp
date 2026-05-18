@@ -61,7 +61,7 @@ export interface ToFigmaScriptResult {
   recipe_md?: string;
 }
 
-const RECIPE_TEMPLATE = (pageName: string, ops: number, codeLen: number) => `# Phase 3 v0.1 import recipe — \`to_figma_script\`
+const RECIPE_TEMPLATE = (pageName: string, ops: number, codeLen: number) => `# Phase 3 v0.1.1 import recipe — \`to_figma_script\`
 
 EBM produced a Plugin API script. Run it inside a Figma file via the Claude.ai Figma MCP.
 
@@ -86,11 +86,18 @@ claude_ai_Figma.use_figma({
 
 > **figma-use skill is MANDATORY before any use_figma call** — load it via Skill tool.
 
-## Caveats v0.1
+## Caveats v0.1.1
 - Image fills SKIPPED (Brain Q2=A) — emitted RECT placeholders named \`IMAGE:...\`.
 - No multi-call chunking — if ops > 30, client should split the script per Figma's 10-op recommendation (split at \`page.appendChild\` boundaries).
 - Font fallback to Inter if requested family unavailable on Figma desktop.
 - VECTOR fallback to RECT if \`svgOuterHtml\` missing.
+
+## figma-use compat fixes (v0.1.1, S63)
+- Removed IIFE wrap (\`(async () => {...})()\`) — use_figma auto-wraps in async + captures \`return\`.
+- \`figma.setCurrentPage(page)\` → \`await figma.setCurrentPageAsync(page)\` (sync setter throws).
+- \`figma.notify(...)\` removed — throws "not implemented" inside use_figma.
+- SOLID paint color stripped to \`{r,g,b}\` (no \`a\` field) — alpha lifted to paint-level \`opacity\` if < 1.
+- Return now includes \`createdNodeIds\` array per figma-use rule #15.
 
 ## Verification
 After step 2, open \`file_url\` returned by step 1 in Figma desktop. Frames should appear at absolute coords matching capture viewport.

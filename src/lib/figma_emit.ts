@@ -27,7 +27,7 @@ import type { FigmaDocument, FigmaNode, FigmaPaint, FigmaColor } from "../extrac
 export interface EmitOptions {
   /** Page name override. Defaults to bundle.source_url. */
   pageName?: string;
-  /** Whether to include initial figma.notify() with bundle metrics. Default true. */
+  /** Deprecated in v0.1.1 (figma.notify throws "not implemented" in use_figma). Ignored. */
   emitNotify?: boolean;
 }
 
@@ -44,13 +44,15 @@ function safeJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function flattenColor(c: FigmaColor): string {
-  return `{ r: ${c.r}, g: ${c.g}, b: ${c.b}, a: ${c.a} }`;
+function flattenColorRgb(c: FigmaColor): string {
+  return `{ r: ${c.r}, g: ${c.g}, b: ${c.b} }`;
 }
 
 function emitPaint(p: FigmaPaint): string | null {
   if (p.type === "SOLID" && p.color) {
-    return `{ type: "SOLID", color: ${flattenColor(p.color)} }`;
+    const a = p.color.a;
+    const opacitySuffix = a !== undefined && a < 1 ? `, opacity: ${a}` : "";
+    return `{ type: "SOLID", color: ${flattenColorRgb(p.color)}${opacitySuffix} }`;
   }
   if ((p.type === "GRADIENT_LINEAR" || p.type === "GRADIENT_RADIAL") && p.gradientStops && p.gradientHandlePositions) {
     return `{ type: ${safeJson(p.type)}, gradientStops: ${safeJson(p.gradientStops)}, gradientHandlePositions: ${safeJson(p.gradientHandlePositions)} }`;
@@ -61,9 +63,10 @@ function emitPaint(p: FigmaPaint): string | null {
 function emitNode(
   node: FigmaNode,
   parentVar: string,
-  counter: { i: number; ops: number; warnings: Map<string, number> }
+  counter: { i: number; ops: number; warnings: Map<string, number>; ids: string[] }
 ): string {
   const v = `n${counter.i++}`;
+  counter.ids.push(v);
   const lines: string[] = [];
   const { x, y, width, height } = node.absoluteBoundingBox;
 
@@ -156,31 +159,31 @@ function emitNode(
 
 export function emitFigmaPluginCode(bundle: FigmaDocument, opts: EmitOptions = {}): EmitResult {
   const pageName = opts.pageName ?? bundle.source_url.slice(0, 80);
-  const emitNotify = opts.emitNotify ?? true;
-  const counter = { i: 0, ops: 0, warnings: new Map<string, number>() };
+  const counter = { i: 0, ops: 0, warnings: new Map<string, number>(), ids: [] as string[] };
   const canvas = bundle.document.children[0];
   const rootNodes = canvas.children;
 
   const nodeBlocks = rootNodes.map((n) => emitNode(n, "page", counter));
 
+  // figma-use compat (v0.1.1) :
+  //  - NO IIFE wrap (use_figma auto-wraps in async + captures return)
+  //  - setCurrentPageAsync (sync setter throws)
+  //  - NO figma.notify (throws "not implemented")
+  //  - return createdNodeIds per figma-use rule #15
   const header = [
-    `// EBM Phase 3 v0.1 emitter — auto-generated from bundle ${bundle.schema}`,
+    `// EBM Phase 3 v0.1.1 emitter — auto-generated from bundle ${bundle.schema}`,
     `// source: ${bundle.source_url}`,
     `// captured_at: ${bundle.captured_at}`,
     `// nodes: ${bundle.metrics.nodes}, viewport: ${bundle.viewport.width}x${bundle.viewport.height}`,
-    `(async () => {`,
-    `  const page = figma.createPage();`,
-    `  page.name = ${safeJson(pageName)};`,
-    `  figma.setCurrentPage(page);`,
+    `const page = figma.createPage();`,
+    `page.name = ${safeJson(pageName)};`,
+    `await figma.setCurrentPageAsync(page);`,
   ].join("\n");
 
-  const footer = [
-    emitNotify
-      ? `  figma.notify(${safeJson(`EBM imported ${bundle.metrics.nodes} nodes from ${pageName}`)});`
-      : "",
-    `  return { page_id: page.id, node_count: ${counter.i} };`,
-    `})();`,
-  ].filter(Boolean).join("\n");
+  const idsArray = counter.ids.length
+    ? `[${counter.ids.map((id) => `${id}.id`).join(", ")}]`
+    : "[]";
+  const footer = `return { page_id: page.id, node_count: ${counter.i}, createdNodeIds: ${idsArray} };`;
 
   const code = [header, ...nodeBlocks, footer].join("\n");
 

@@ -68,9 +68,14 @@ export async function getSharedContext(viewport: Viewport): Promise<BrowserConte
   const mode = resolveMode();
 
   if (shared) {
-    if (shared.mode !== mode || !viewportEqual(shared.viewport, viewport)) {
+    if (shared.mode !== mode) {
+      // Mode switch (chromium ↔ chrome ↔ cdp) forces relaunch.
       await closeSharedContext();
     } else {
+      // Viewport mismatch S63 fix : do NOT close+relaunch (triggers caveat #1
+      // Patchright UDD-reuse hang after 3+ consecutive launchPersistentContext).
+      // Caller is expected to call `page.setViewportSize(vp)` after `ctx.newPage()`
+      // when its viewport differs from `shared.viewport`. See newPageForViewport().
       return shared.context;
     }
   }
@@ -86,6 +91,22 @@ export async function getSharedContext(viewport: Viewport): Promise<BrowserConte
     shared = { context, browser: null, viewport, mode };
   }
   return shared.context;
+}
+
+// S63 helper : new page + apply viewport. Use this instead of ctx.newPage()
+// followed by manual setViewportSize. Avoids caveat #1 UDD-reuse hang by
+// not re-launching on viewport switches.
+export async function newPageForViewport(viewport: Viewport): Promise<{ ctx: BrowserContext; page: import("patchright").Page }> {
+  const ctx = await getSharedContext(viewport);
+  const page = await ctx.newPage();
+  if (shared && !viewportEqual(shared.viewport, viewport)) {
+    try {
+      await page.setViewportSize(viewport);
+    } catch (e) {
+      console.error(`newPageForViewport: setViewportSize(${viewport.width}x${viewport.height}) failed: ${(e as Error).message}`);
+    }
+  }
+  return { ctx, page };
 }
 
 export async function closeSharedContext(): Promise<void> {
