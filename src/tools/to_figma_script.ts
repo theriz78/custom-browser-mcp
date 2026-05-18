@@ -22,7 +22,7 @@
  */
 import { z } from "zod";
 import { toFigma, type ToFigmaResult } from "./to_figma.js";
-import { emitFigmaPluginCode, type EmitResult, type EmitChunk } from "../lib/figma_emit.js";
+import { emitFigmaPluginCode, type EmitResult, type EmitChunk, type ImageTarget } from "../lib/figma_emit.js";
 
 const PASTE_HTML_MAX_BYTES = 8 * 1024 * 1024;
 const PAGE_ID_PLACEHOLDER = "__EBM_PAGE_ID__";
@@ -68,19 +68,21 @@ export interface ToFigmaScriptResult {
   /** Sentinel placeholder for idMap JSON substitution in chunks[i>0]. */
   id_map_placeholder: typeof ID_MAP_PLACEHOLDER;
   estimated_ops: number;
+  /** Image fill targets (v0.3) — client iterates post-chunks via upload_assets MCP. */
+  image_targets: ImageTarget[];
   bundle_warnings: ToFigmaResult["document"]["warnings"];
   emit_warnings: EmitResult["warnings"];
   metrics: ToFigmaResult["document"]["metrics"];
   recipe_md?: string;
 }
 
-const RECIPE_TEMPLATE = (pageName: string, chunks: EmitChunk[]) => {
+const RECIPE_TEMPLATE = (pageName: string, chunks: EmitChunk[], imageTargets: ImageTarget[]) => {
   const totalOps = chunks.reduce((s, c) => s + c.ops, 0);
-  const totalImages = chunks.reduce((s, c) => s + c.image_count, 0);
+  const totalImages = imageTargets.length;
   const isMulti = chunks.length > 1;
-  return `# Phase 3 v0.2 import recipe — \`to_figma_script\` (chunked + image hybrid)
+  return `# Phase 3 v0.3 import recipe — \`to_figma_script\` (chunked + upload_assets)
 
-EBM produced **${chunks.length} chunk${chunks.length === 1 ? "" : "s"}** of Plugin API code (total: ~${totalOps} ops, ${totalImages} image${totalImages === 1 ? "" : "s"}).
+EBM produced **${chunks.length} chunk${chunks.length === 1 ? "" : "s"}** of Plugin API code (total: ~${totalOps} ops, ${totalImages} image fill target${totalImages === 1 ? "" : "s"} deferred to upload_assets).
 
 ## Step 1 — Create file
 
@@ -130,15 +132,53 @@ This bundle fits in one chunk (~${chunks[0]?.bytes ?? 0} bytes ≤ 50KB use_figm
 }
 > **figma-use skill is MANDATORY before any use_figma call** — load it via Skill tool.
 
-## Image hybrid (v0.2 Q2-D)
-- Each chunk's prelude calls \`figma.createImageAsync(src)\` for every image URL in its scope and stores hashes in \`_img_map\`.
-- IMAGE paints reference \`_img_map.get(src)\` at fill-set time. On CORS/404/silent-reject, the paint is skipped and the node name is prefixed with \`IMAGE:\` as debug marker (frame remains a placeholder).
-- Risks : 4096px max, hot-link-protected URLs reject silently — see handoff S66.
+## Step ${isMulti ? "4" : "3"} — Image fills via \`upload_assets\` (v0.3)
 
-## Caveats v0.2
+${
+  totalImages === 0
+    ? `No image fill targets in this bundle. Skip.`
+    : `EBM emitted **${totalImages} image fill target${totalImages === 1 ? "" : "s"}** as RECT placeholders (name prefix \`IMAGE:\`). For each target in \`result.image_targets\`, resolve the var to its real Figma node id via the accumulated idMap, then upload the bitmap :
+
+\`\`\`
+for (const target of image_targets) {
+  const real_id = id_map_accumulated[target.var];
+  if (!real_id) continue; // skip if var unmapped (defensive)
+
+  // 1. Get a single-use upload URL bound to this node.
+  const upload = await claude_ai_Figma.upload_assets({
+    fileKey: file_key,
+    nodeId: real_id,
+    count: 1,
+    scaleMode: target.scaleMode,
+  });
+  const submit_url = upload.uploads[0].submitUrl;
+
+  // 2. Fetch the source bytes (CORS handled server-side by the fetch runtime).
+  const res = await fetch(target.src);
+  if (!res.ok) continue; // skip 404 / hot-link-protected
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const mime = res.headers.get("content-type") ?? guessMime(target.src) ?? "image/jpeg";
+
+  // 3. POST raw bytes to submitUrl (multipart/form-data also accepted with 'file' field).
+  await fetch(submit_url, {
+    method: "POST",
+    body: bytes,
+    headers: { "Content-Type": mime },
+  });
+}
+\`\`\`
+
+\`submitUrl\` is **single-use, expires after 10 minutes**. \`upload_assets\` returns \`{ uploads: [{ submitUrl }], instructions }\`. With \`nodeId\` + \`count: 1\`, the resulting imageHash is bound as a fill on the existing node automatically — no further use_figma call needed.
+
+Supported MIME : \`image/png\`, \`image/jpeg\`, \`image/gif\`, \`image/webp\`. Max 10 MB per asset.
+`
+}
+
+## Caveats v0.3
 - VECTOR fallback to RECT if \`svgOuterHtml\` missing.
 - Font fallback to Inter if requested family unavailable on Figma desktop.
 - chunks[i>0] require BOTH literal \`${PAGE_ID_PLACEHOLDER}\` (page id) AND \`${ID_MAP_PLACEHOLDER}\` (JSON of accumulated idMap) substitution — do NOT skip either (will throw at runtime).
+- Image upload failures (network, CORS, 404, unsupported MIME) leave the RECT placeholder with name \`IMAGE:\` — non-fatal, atomic per-target.
 
 ## figma-use compat (v0.1.1+, S65 baseline)
 - No IIFE wrap (use_figma auto-wraps + captures \`return\`).
@@ -186,9 +226,10 @@ export async function toFigmaScript(rawInput: unknown): Promise<ToFigmaScriptRes
     page_id_placeholder: PAGE_ID_PLACEHOLDER,
     id_map_placeholder: ID_MAP_PLACEHOLDER,
     estimated_ops: emit.estimatedOps,
+    image_targets: emit.image_targets,
     bundle_warnings: bundle.warnings,
     emit_warnings: emit.warnings,
     metrics: bundle.metrics,
-    ...(input.include_recipe ? { recipe_md: RECIPE_TEMPLATE(pageName, emit.chunks) } : {}),
+    ...(input.include_recipe ? { recipe_md: RECIPE_TEMPLATE(pageName, emit.chunks, emit.image_targets) } : {}),
   };
 }

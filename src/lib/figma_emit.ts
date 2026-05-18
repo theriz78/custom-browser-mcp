@@ -1,15 +1,22 @@
 /**
- * Phase 3 v0.2 — EBM bundle → use_figma plugin JS string emitter (flat + chunked + image hybrid).
+ * Phase 3 v0.3 — EBM bundle → use_figma plugin JS string emitter (flat + chunked + upload_assets).
  *
- * Strategy v0.2 (S66) :
+ * Strategy v0.3 (S67) :
  * 1. Walk the tree pre-order, emit each node as a flat record with its own `nX` var, parent var,
- *    create/config lines (no inline appendChild), and image URLs referenced.
+ *    create/config lines (no inline appendChild), and image fill targets collected separately.
  * 2. Bin-pack the flat sequence into chunks under maxBytesPerChunk (default 40KB, under 50KB cap).
  * 3. For each chunk[i>0], re-resolve any parent var created in a previous chunk via
  *    `figma.getNodeByIdAsync(_idMap[parentVar])`.
- * 4. Image hybrid (Brain Q2-D) : per-chunk prelude calls `figma.createImageAsync(src)` for all
- *    image URLs in this chunk and stores hashes in `_img_map`. IMAGE paints look up hash at fill-set
- *    time; fallback = no IMAGE paint + name prefix `IMAGE:` for debugging.
+ * 4. Image fills emitted as RECT placeholders (figma.createRectangle) with name prefix `IMAGE:`.
+ *    Actual bitmap fills applied client-side post-chunks via `upload_assets` MCP. Emit aggregates
+ *    `image_targets: [{var, src, scaleMode, chunkIndex}]` ; client resolves `var → real node id`
+ *    through the accumulated idMap, then calls upload_assets with that nodeId + POSTs raw bytes
+ *    fetched from `src` to the returned `submitUrl`.
+ *
+ * Why no createImageAsync ? The use_figma sandbox does NOT expose the otherwise-standard Plugin
+ * API method `figma.createImageAsync` (verified live S66, error : '"createImageAsync" is not a
+ * supported API'). upload_assets is the server-side path : it returns presigned URLs and binds
+ * the resulting imageHash as a fill on the target node automatically.
  *
  * Client-side threading (recipe.md explains in detail) :
  * - chunks[0] returns `{ page_id, id_map: { nX: "real_id", ... }, createdNodeIds }`.
@@ -17,6 +24,11 @@
  *   `__EBM_ID_MAP_JSON__` with JSON.stringify(idMap accumulated so far) — then runs use_figma.
  * - chunk[i>0] returns its own `{ id_map_additions, createdNodeIds }` which the client merges
  *   into the running idMap before invoking the next chunk.
+ * - After ALL chunks done, client iterates `image_targets` and per-target :
+ *     (a) lookup `real_id = id_map_accumulated[target.var]` ;
+ *     (b) call upload_assets({fileKey, nodeId: real_id, count: 1, scaleMode: target.scaleMode}) ;
+ *     (c) fetch source bytes from target.src ; POST to upload response submitUrl with
+ *         Content-Type matching the image MIME.
  *
  * v0.1.1 (S65) figma-use compat preserved : no IIFE wrap, setCurrentPageAsync, no figma.notify,
  * paint color {r,g,b} + paint-level opacity, createdNodeIds returned.
@@ -40,12 +52,23 @@ export interface EmitChunk {
   bytes: number;
   /** Number of figma.createX ops in this chunk. */
   ops: number;
-  /** Number of image preloads in this chunk. */
+  /** Number of image fill targets in this chunk (deferred to client upload_assets loop). */
   image_count: number;
   /** True if chunk requires __EBM_PAGE_ID__ + __EBM_ID_MAP_JSON__ substitution (chunks[i>0]). */
   needs_substitution: boolean;
   /** Vars (e.g. "n5") that this chunk re-resolves from a previous chunk's idMap. */
   imported_parent_vars: string[];
+}
+
+export interface ImageTarget {
+  /** Emit-time var (e.g. "n42"). Client maps to real node id via accumulated idMap. */
+  var: string;
+  /** Source URL — client fetches bytes, POSTs to upload_assets submitUrl. */
+  src: string;
+  /** Figma scale mode for the image fill (FILL | FIT | CROP | TILE). */
+  scaleMode: "FILL" | "FIT" | "CROP" | "TILE";
+  /** Index of the chunk that created the var (informational). */
+  chunkIndex: number;
 }
 
 export interface EmitResult {
@@ -54,6 +77,8 @@ export interface EmitResult {
   /** Back-compat shortcut. Always equals chunks[0].code. */
   code: string;
   estimatedOps: number;
+  /** Image fill targets aggregated across chunks. Client iterates post-chunks via upload_assets. */
+  image_targets: ImageTarget[];
   warnings: { kind: string; count: number; hint: string }[];
 }
 
@@ -69,6 +94,21 @@ function flattenColorRgb(c: FigmaColor): string {
   return `{ r: ${c.r}, g: ${c.g}, b: ${c.b} }`;
 }
 
+function gradientTransformFromHandles(handles: { x: number; y: number }[]): number[][] {
+  // Plugin API GRADIENT_* paints take a 2x3 affine transform matrix [[a,b,tx],[c,d,ty]]
+  // mapping (0,0)..(1,0)..(0,1) in unit space to the gradient handle positions.
+  // handles[0] = origin, handles[1] = end-of-primary-axis, handles[2] = end-of-perpendicular-axis.
+  // If handles are missing or malformed, fall back to identity (left-to-right horizontal).
+  const h0 = handles?.[0];
+  const h1 = handles?.[1];
+  const h2 = handles?.[2];
+  if (!h0 || !h1 || !h2) return [[1, 0, 0], [0, 1, 0]];
+  return [
+    [h1.x - h0.x, h2.x - h0.x, h0.x],
+    [h1.y - h0.y, h2.y - h0.y, h0.y],
+  ];
+}
+
 function emitSolidOrGradientPaint(p: FigmaPaint): string | null {
   if (p.type === "SOLID" && p.color) {
     const a = p.color.a;
@@ -76,7 +116,14 @@ function emitSolidOrGradientPaint(p: FigmaPaint): string | null {
     return `{ type: "SOLID", color: ${flattenColorRgb(p.color)}${opacitySuffix} }`;
   }
   if ((p.type === "GRADIENT_LINEAR" || p.type === "GRADIENT_RADIAL") && p.gradientStops && p.gradientHandlePositions) {
-    return `{ type: ${safeJson(p.type)}, gradientStops: ${safeJson(p.gradientStops)}, gradientHandlePositions: ${safeJson(p.gradientHandlePositions)} }`;
+    // Plugin API rejects `gradientHandlePositions` ; it expects `gradientTransform` 2x3 matrix.
+    // ColorStop.color REQUIRES all four channels {r,g,b,a} — alpha defaults to 1 if missing.
+    const stops = p.gradientStops.map((s: { color: FigmaColor; position: number }) => ({
+      color: { r: s.color.r, g: s.color.g, b: s.color.b, a: s.color.a ?? 1 },
+      position: s.position,
+    }));
+    const transform = gradientTransformFromHandles(p.gradientHandlePositions);
+    return `{ type: ${safeJson(p.type)}, gradientStops: ${safeJson(stops)}, gradientTransform: ${safeJson(transform)} }`;
   }
   return null;
 }
@@ -86,8 +133,8 @@ interface NodeEmit {
   parentVar: string;
   /** Create + config lines WITHOUT the appendChild line. */
   createLines: string[];
-  /** Image URLs referenced by IMAGE paint fills (for prelude). */
-  imageUrls: string[];
+  /** Image fill targets emitted by this node (deferred to client upload_assets loop). */
+  imageTargets: { src: string; scaleMode: "FILL" | "FIT" | "CROP" | "TILE" }[];
   /** Counted ops (createX call count = 1). */
   ops: number;
   /** Warnings raised during emit. */
@@ -103,7 +150,7 @@ function emitNodeFlat(
   const v = `n${varCounter.i++}`;
   const lines: string[] = [];
   const warnings = new Map<string, number>();
-  const imageUrls: string[] = [];
+  const imageTargets: { src: string; scaleMode: "FILL" | "FIT" | "CROP" | "TILE" }[] = [];
   const { x, y, width, height } = node.absoluteBoundingBox;
   let ops = 0;
 
@@ -164,24 +211,22 @@ function emitNodeFlat(
 
   if (node.fills && node.fills.length > 0) {
     const fillExprs: string[] = [];
-    let imageSrc: string | null = null;
+    let hasImageFill = false;
 
     for (const p of node.fills) {
       if (p.type === "IMAGE" && p.imageRef) {
-        imageSrc = p.imageRef;
-        imageUrls.push(p.imageRef);
-        const scaleMode = p.scaleMode ?? "FILL";
-        fillExprs.push(
-          `...(_img_map.get(${safeJson(p.imageRef)}) ? [{ type: "IMAGE", imageHash: _img_map.get(${safeJson(p.imageRef)}), scaleMode: ${safeJson(scaleMode)} }] : [])`,
-        );
+        hasImageFill = true;
+        const scaleMode = (p.scaleMode ?? "FILL") as "FILL" | "FIT" | "CROP" | "TILE";
+        imageTargets.push({ src: p.imageRef, scaleMode });
         continue;
       }
       const e = emitSolidOrGradientPaint(p);
       if (e !== null) fillExprs.push(e);
     }
 
-    if (imageSrc !== null) {
-      lines.push(`if (!_img_map.get(${safeJson(imageSrc)})) ${v}.name = ${safeJson(`IMAGE:${node.name}`)};`);
+    if (hasImageFill) {
+      // Mark placeholder; client will overwrite fill via upload_assets post-chunks.
+      lines.push(`${v}.name = ${safeJson(`IMAGE:${node.name}`)};`);
     }
 
     if (fillExprs.length > 0) {
@@ -200,7 +245,7 @@ function emitNodeFlat(
     lines.push(`${v}.clipsContent = ${node.clipsContent};`);
   }
 
-  out.push({ var: v, parentVar, createLines: lines, imageUrls, ops, warnings });
+  out.push({ var: v, parentVar, createLines: lines, imageTargets, ops, warnings });
 
   if (node.children && node.children.length > 0 && (node.type === "FRAME" || node.type === "GROUP")) {
     for (const child of node.children) {
@@ -239,12 +284,12 @@ function buildChunkCode(opts: {
   pageName: string;
   bundle: FigmaDocument;
   vars_created_in_earlier_chunks: Set<string>;
-}): { code: string; importedParents: string[]; imageCount: number; ops: number; warnings: Map<string, number>; createdVars: string[] } {
+}): { code: string; importedParents: string[]; imageCount: number; imageTargets: ImageTarget[]; ops: number; warnings: Map<string, number>; createdVars: string[] } {
   const { pack, chunkIndex, totalChunks, isFirst, pageName, bundle, vars_created_in_earlier_chunks } = opts;
   const lines: string[] = [];
 
   // ── Comment header
-  lines.push(`// EBM Phase 3 v0.2 emitter — chunk ${chunkIndex + 1}/${totalChunks} (${isFirst ? "creates page" : "re-attaches page + idMap"})`);
+  lines.push(`// EBM Phase 3 v0.3 emitter — chunk ${chunkIndex + 1}/${totalChunks} (${isFirst ? "creates page" : "re-attaches page + idMap"})`);
   lines.push(`// source: ${bundle.source_url}`);
   if (isFirst) {
     lines.push(`// captured_at: ${bundle.captured_at}`);
@@ -283,33 +328,22 @@ function buildChunkCode(opts: {
     importedParents.push(p);
   }
 
-  // ── Image prelude
-  // Runtime feature-check : figma.createImageAsync exists in standalone Plugin API but is NOT
-  // exposed in the use_figma sandbox (verified S66). If unavailable → leave _img_map empty,
-  // node fills skip IMAGE paint, name prefix `IMAGE:` marks placeholder. Real bitmap import
-  // requires upload_assets MCP (server-side) or inline base64 — deferred S67+.
-  const allImageUrls = Array.from(new Set(pack.emits.flatMap((e) => e.imageUrls)));
-  if (allImageUrls.length === 0) {
-    lines.push(`const _img_map = new Map();`);
-  } else {
-    lines.push(`const _img_urls = ${safeJson(allImageUrls)};`);
-    lines.push(`const _img_map = new Map();`);
-    lines.push(`if (typeof figma.createImageAsync === "function") {`);
-    lines.push(`  const _img_results = await Promise.all(_img_urls.map((u) => figma.createImageAsync(u).then((i) => i.hash).catch(() => null)));`);
-    lines.push(`  for (let i = 0; i < _img_urls.length; i++) _img_map.set(_img_urls[i], _img_results[i]);`);
-    lines.push(`}`);
-  }
+  // ── No image prelude (v0.3) : image fills deferred to client upload_assets loop post-chunks.
 
   // ── Node creates + configs + appendChild
   const ops = pack.emits.reduce((s, e) => s + e.ops, 0);
   const warningAgg = new Map<string, number>();
   const createdVars: string[] = [];
+  const chunkImageTargets: ImageTarget[] = [];
   for (const e of pack.emits) {
     for (const l of e.createLines) lines.push(`  ${l}`);
     lines.push(`  ${e.parentVar}.appendChild(${e.var});`);
     lines.push(`  _idMap[${safeJson(e.var)}] = ${e.var}.id;`);
     createdVars.push(e.var);
     for (const [k, v] of e.warnings) warningAgg.set(k, (warningAgg.get(k) ?? 0) + v);
+    for (const t of e.imageTargets) {
+      chunkImageTargets.push({ var: e.var, src: t.src, scaleMode: t.scaleMode, chunkIndex });
+    }
   }
 
   // ── Footer
@@ -323,7 +357,8 @@ function buildChunkCode(opts: {
   return {
     code: lines.join("\n"),
     importedParents,
-    imageCount: allImageUrls.length,
+    imageCount: chunkImageTargets.length,
+    imageTargets: chunkImageTargets,
     ops,
     warnings: warningAgg,
     createdVars,
@@ -350,6 +385,7 @@ export function emitFigmaPluginCode(bundle: FigmaDocument, opts: EmitOptions = {
   // Step 3 — assemble chunks with idMap re-resolve
   const varsCreatedInEarlierChunks = new Set<string>();
   const aggregatedWarnings = new Map<string, number>();
+  const aggregatedImageTargets: ImageTarget[] = [];
   let totalOps = 0;
   const chunks: EmitChunk[] = packs.map((pack, idx) => {
     const built = buildChunkCode({
@@ -366,6 +402,7 @@ export function emitFigmaPluginCode(bundle: FigmaDocument, opts: EmitOptions = {
       aggregatedWarnings.set(k, (aggregatedWarnings.get(k) ?? 0) + v);
     }
     for (const v of built.createdVars) varsCreatedInEarlierChunks.add(v);
+    for (const t of built.imageTargets) aggregatedImageTargets.push(t);
     return {
       index: idx,
       code: built.code,
@@ -379,19 +416,19 @@ export function emitFigmaPluginCode(bundle: FigmaDocument, opts: EmitOptions = {
 
   const totalImages = chunks.reduce((s, c) => s + c.image_count, 0);
   if (totalImages > 0) {
-    aggregatedWarnings.set("image_hybrid_inline", totalImages);
+    aggregatedWarnings.set("image_deferred_upload", totalImages);
   }
 
   const warnings = Array.from(aggregatedWarnings.entries()).map(([kind, count]) => ({
     kind,
     count,
     hint:
-      kind === "image_hybrid_inline"
-        ? "v0.2 Q2-D : emit calls figma.createImageAsync(src) IF available at runtime. Sandbox may not expose it (verified S66 use_figma sandbox does NOT). Fallback : no IMAGE paint + name prefix IMAGE: as debug marker. Real bitmaps require upload_assets MCP or inline base64 (S67+)."
+      kind === "image_deferred_upload"
+        ? "v0.3 : IMAGE paints emitted as RECT placeholders + name prefix IMAGE:. Client must iterate result.image_targets post-chunks, call upload_assets({fileKey, nodeId: id_map_accumulated[t.var], count: 1, scaleMode: t.scaleMode}) per target, fetch bytes from t.src, POST to returned submitUrl."
         : kind === "vector_no_svg"
           ? "VECTOR node missing svgOuterHtml — emitted RECT fallback."
           : kind === "unsupported_type"
-            ? "FigmaNode.type unsupported in v0.2 emitter — emitted FRAME fallback."
+            ? "FigmaNode.type unsupported in v0.3 emitter — emitted FRAME fallback."
             : "Unknown warning.",
   }));
 
@@ -399,6 +436,7 @@ export function emitFigmaPluginCode(bundle: FigmaDocument, opts: EmitOptions = {
     chunks,
     code: chunks[0]?.code ?? "",
     estimatedOps: totalOps,
+    image_targets: aggregatedImageTargets,
     warnings,
   };
 }

@@ -1,10 +1,11 @@
 /**
- * S66 Phase 3 v0.2 E2E — full multi-chunk variant.
+ * S67 Phase 3 v0.3 E2E — full multi-chunk variant with image_targets verification.
  *
  * Forces multi-chunk emit by max_nodes high enough to exceed 40KB per-chunk budget.
  * Writes /out/figma-script-full-chunkN.js + .recipe.md.
  * Simulates client-side substitution of __EBM_PAGE_ID__ + __EBM_ID_MAP_JSON__ and parses
  * each substituted chunk via `new Function(...)` to catch syntax errors before live E2E.
+ * Verifies image_targets aggregate is well-formed (var, src, scaleMode, chunkIndex).
  */
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -79,6 +80,17 @@ async function main() {
         emit_warnings: r.emit_warnings.map((w) => w.kind),
         parse_report: parseReport,
         all_chunks_parse_ok: parseReport.every((p) => p.parse_ok),
+        image_targets_total: r.image_targets.length,
+        image_targets_head: r.image_targets.slice(0, 3),
+        image_targets_well_formed: r.image_targets.every(
+          (t) =>
+            typeof t.var === "string" &&
+            t.var.startsWith("n") &&
+            typeof t.src === "string" &&
+            t.src.length > 0 &&
+            ["FILL", "FIT", "CROP", "TILE"].includes(t.scaleMode) &&
+            typeof t.chunkIndex === "number",
+        ),
       },
       null,
       2,
